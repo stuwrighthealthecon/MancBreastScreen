@@ -29,34 +29,34 @@ MISCLASS <- controls$MISCLASS # Set to TRUE to include impact of errors in risk 
 PREVENTATIVE_DRUG <- controls$PREVENTATIVE_DRUG # Set to TRUE to simulate preventative drugs
 
 # Add specifiers for output files
-det_output_path <- "Deterministic results/"
-psa_output_path <- "PSA results/"
+det_output_path <- "output/deterministic_results/"
+psa_output_path <- "output/psa_results/"
 if (MISCLASS & PREVENTATIVE_DRUG) {
   dir.create(
-    "Deterministic results/misclassification_and_preventative_drug",
-    showWarnings = FALSE
+    "output/deterministic_results/misclassification_and_preventative_drug",
+    showWarnings = FALSE, recursive = TRUE
   )
-  det_output_path <- "Deterministic results/misclassification_and_preventative_drug/"
+  det_output_path <- "output/deterministic_results/misclassification_and_preventative_drug/"
   dir.create(
-    "PSA results/misclassification_and_preventative_drug",
-    showWarnings = FALSE
+    "output/psa_results/misclassification_and_preventative_drug",
+    showWarnings = FALSE, recursive = TRUE
   )
-  psa_output_path <- "PSA results/misclassification_and_preventative_drug/"
+  psa_output_path <- "output/psa_results/misclassification_and_preventative_drug/"
 } else {
   if (MISCLASS) {
-    dir.create("Deterministic results/misclassification", showWarnings = FALSE)
-    det_output_path <- "Deterministic results/misclassification/"
-    dir.create("PSA results/misclassification", showWarnings = FALSE)
-    psa_output_path <- "PSA results/misclassification/"
+    dir.create("output/deterministic_results/misclassification", showWarnings = FALSE, recursive = TRUE)
+    det_output_path <- "output/deterministic_results/misclassification/"
+    dir.create("output/psa_results/misclassification", showWarnings = FALSE, recursive = TRUE)
+    psa_output_path <- "output/psa_results/misclassification/"
   }
   if (PREVENTATIVE_DRUG) {
-    dir.create("Deterministic results/preventative_drug", showWarnings = FALSE)
-    det_output_path <- "Deterministic results/preventative_drug/"
+    dir.create("output/deterministic_results/preventative_drug", showWarnings = FALSE, recursive = TRUE)
+    det_output_path <- "output/deterministic_results/preventative_drug/"
     dir.create(
-      "PSA results/misclassification_and_preventative_drug",
-      showWarnings = FALSE
+      "output/psa_results/misclassification_and_preventative_drug",
+      showWarnings = FALSE, recursive = TRUE
     )
-    psa_output_path <- "PSA results/misclassification_and_preventative_drug/"
+    psa_output_path <- "output/psa_results/misclassification_and_preventative_drug/"
   }
 }
 
@@ -66,10 +66,9 @@ sample_fname <- "possample"
 tic()
 
 #Load file containing required functions for the model
-source(file = "MANC_RISK_SCREEN_functions.R")
-source(file = "risksample function.R")
-source(file = "negsample function.R")
-source(file = "des_vectorised_df.R")
+source(file = "R/MancBreastScreen_functions.R")
+source(file = "R/risksample_functions.R")
+source(file = "R/des_vectorised_df.R")
 
 #Set the screening strategy: 1=PROCAS, 2=Risk tertiles, 3=3 yearly, 4=2 yearly,
 #5=5 yearly, 6=2 rounds at 50 and 60 (10 yearly), 7=Low risk (5 yearly),
@@ -105,17 +104,17 @@ for (r in 1:length(screen_strategies)) {
 
   #################################Import baseline parameters####################
 
-  source(file = "params.R")
+  source(file = "parameters/params.R")
 
   #########################CREATE SAMPLE OF WOMEN FOR MODEL###################
   if (MISCLASS) {
     if (gensample == 1) {
-      dir.create("Risksamplewithmisclass", showWarnings = FALSE)
+      dir.create("output/risksample_misclass", showWarnings = FALSE, recursive = TRUE)
       create_sample_with_misclass(PSA, intervals, seed, screen_strategy)
     }
   } else {
     if (gensample == 1) {
-      dir.create("Risksample", showWarnings = FALSE)
+      dir.create("output/risksample", showWarnings = FALSE, recursive = TRUE)
       cmp_create_sample(PSA, intervals, seed, screen_strategy)
     }
   }
@@ -126,13 +125,13 @@ for (r in 1:length(screen_strategies)) {
   
   if (MISCLASS) {
     load(paste(
-      "Risksamplewithmisclass/",
+      "output/risksample_misclass/",
       sample_fname,
       ".Rdata",
       sep = ""
     ))
   } else {
-    load(paste("Risksample/", sample_fname, ".Rdata", sep = ""))
+    load(paste("output/risksample/", sample_fname, ".Rdata", sep = ""))
   }
   prefix <- paste("^", "X", 1, ".", sep = "")
   names(risksample) <- sub(prefix, "", names(risksample))
@@ -476,7 +475,6 @@ for (r in 1:length(screen_strategies)) {
                        biopsy_rate = biopsy_rate,cost_biop=cost_biop)
   } #End i loop
 
-  negsamplefn(screen_strategy, MISCLASS, PSA)
 
  print(paste("Strategy ",r," Complete")) 
 }

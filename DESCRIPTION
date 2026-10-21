@@ -1,0 +1,46 @@
+Package: MancBreastScreen
+Type: Package
+Title: Discrete Event Simulation of Risk-Stratified Breast Cancer Screening
+Version: 1.3.1
+Authors@R: c(
+    person("Stuart", "Wright", email = "stuart.j.wright@manchester.ac.uk",
+           role = c("aut", "cre")),
+    person("Joe", "Hilton", role = "aut"),
+    person("Gabriel", "Rogers", role = "aut"),
+    person("Ewan", "Gray", role = "aut"),
+    person("Anna", "Donten", role = "aut"),
+    person("Lorna", "McWilliams", role = "aut"),
+    person("D Gareth", "Evans", role = "aut"),
+    person("David", "French", role = "aut"),
+    person("Katherine", "Payne", role = "aut")
+  )
+Description: A discrete event simulation model estimating the costs, QALYs
+    and clinical outcomes of breast cancer screening strategies, including
+    risk-stratified screening, for women in the UK. Originally published in
+    Gray et al. (2017), Value in Health 20:1100-1109.
+License: GPL-3
+Encoding: UTF-8
+URL: https://github.com/stuwrighthealthecon/MancBreastScreen
+BugReports: https://github.com/stuwrighthealthecon/MancBreastScreen/issues
+Imports:
+    compiler,
+    doParallel,
+    dqrng,
+    dplyr,
+    foreach,
+    iterators,
+    MASS,
+    matrixStats,
+    purrr,
+    tidyr
+Suggests:
+    GauPro,
+    gt,
+    here,
+    magrittr,
+    mgcv,
+    pacman,
+    pdftools,
+    scales,
+    tictoc,
+    tidyverse

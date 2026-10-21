@@ -2,12 +2,12 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
   #Remove existing samples to avoid errors
   do.call(
     file.remove,
-    list(list.files("Risksamplewithmisclass/", full.names = TRUE))
+    list(list.files("output/risksample_misclass/", full.names = TRUE))
   )
-  do.call(file.remove, list(list.files("Risksample/", full.names = TRUE)))
+  do.call(file.remove, list(list.files("output/risksample/", full.names = TRUE)))
 
   #Import synthetic dataset derived from PROCAS2 study
-  risk_mat <- read.csv("Data/synthetic_risk_data.csv")[, 2:4]
+  risk_mat <- read.csv("inst/extdata/synthetic_risk_data.csv")[, 2:4]
   colnames(risk_mat) <- c("VBD", "tenyrrisk", "liferisk")
 
   #Creat column for risk group to be entered
@@ -147,7 +147,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     if (intervals == 0) {
       #########################Add Monte Carlo Draws into Sample##############
 
-      source(file = "psa_params.R")
+      source(file = "parameters/psa_params.R")
 
       #Draw stage I to III survival parameters
       PSA_gamma_survival <- mvrnorm(mcruns, survmeans, survcovmat) %>%
@@ -211,7 +211,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       PSA_util <- (1 - exp(mvrnorm(mcruns, utilmeans, covutil))) %>%
         data.frame()
     } else {
-      source(file = "psa_params_intervals.R")
+      source(file = "parameters/psa_params_intervals.R")
 
       PSA_gamma_survival <- data.frame(
         runif(mcruns, PSA_gamma_survival1[1], PSA_gamma_survival1[2]),
@@ -361,7 +361,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES
     risksample <- masterframe %>% filter(masterframe$life_expectancy >= screen_startage)
-    save(risksample, file = "Risksample/possample.Rdata")
+    save(risksample, file = "output/risksample/possample.Rdata")
     #Clean up redundant inputs
     rm(masterframe, PSA_all_p, risk_mat)
     gc()
@@ -370,7 +370,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES
     risksample <- risksample %>% filter(risksample$life_expectancy >= screen_startage)
-    save(risksample, file = "Risksample/possample.Rdata")
+    save(risksample, file = "output/risksample/possample.Rdata")
   }
 }
 
@@ -385,7 +385,7 @@ create_sample_with_misclass <- function(
   screen_strategy
 ) {
   #Import synthetic dataset derived from PROCAS2 study
-  risk_mat <- read.csv("Data/synthetic_risk_data_with_misclassification.csv")[,
+  risk_mat <- read.csv("inst/extdata/synthetic_risk_data_with_misclassification.csv")[,
     2:7
   ] %>%
     dplyr::select(!syn.Age)
@@ -548,7 +548,7 @@ create_sample_with_misclass <- function(
     if (intervals == 0) {
       #########################Add Monte Carlo Draws into Sample##############
 
-      source(file = "psa_params.R")
+      source(file = "parameters/psa_params.R")
 
       #Draw stage I to III survival parameters
       PSA_gamma_survival <- mvrnorm(mcruns, survmeans, survcovmat) %>%
@@ -612,7 +612,7 @@ create_sample_with_misclass <- function(
       PSA_util <- (1 - exp(mvrnorm(mcruns, utilmeans, covutil))) %>%
         data.frame()
     } else {
-      source(file = "psa_params_intervals.R")
+      source(file = "parameters/psa_params_intervals.R")
 
       PSA_gamma_survival <- data.frame(
         runif(mcruns, PSA_gamma_survival1[1], PSA_gamma_survival1[2]),
@@ -762,7 +762,7 @@ create_sample_with_misclass <- function(
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES
     risksample <- masterframe %>% filter(masterframe$life_expectancy >= screen_startage)
-    save(risksample, file = "Risksamplewithmisclass/possample.Rdata")
+    save(risksample, file = "output/risksample_misclass/possample.Rdata")
     #Clean up redundant inputs
     rm(masterframe, PSA_all_p, risk_mat)
     gc()
@@ -773,7 +773,7 @@ create_sample_with_misclass <- function(
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES
     risksample <- risksample %>% filter(risksample$life_expectancy >= screen_startage)
-    save(risksample, file = "Risksamplewithmisclass/possample.Rdata")
+    save(risksample, file = "output/risksample_misclass/possample.Rdata")
     }
   }
 

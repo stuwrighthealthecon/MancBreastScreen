@@ -39,31 +39,31 @@ controls$n_cores <- min(length(controls$strategies), max(1L, parallel::detectCor
 # -----------------------------------------------------------------------------
 # Set output directories
 # -----------------------------------------------------------------------------
-det_output_path <- "Deterministic results/"
-psa_output_path <- "PSA results/"
+det_output_path <- "output/deterministic_results/"
+psa_output_path <- "output/psa_results/"
 
 if (MISCLASS & PREVENTATIVE_DRUG) {
-  dir.create("Deterministic results/misclassification_and_preventative_drug",
+  dir.create("output/deterministic_results/misclassification_and_preventative_drug",
              showWarnings = FALSE, recursive = TRUE)
-  dir.create("PSA results/misclassification_and_preventative_drug",
+  dir.create("output/psa_results/misclassification_and_preventative_drug",
              showWarnings = FALSE, recursive = TRUE)
-  det_output_path <- "Deterministic results/misclassification_and_preventative_drug/"
-  psa_output_path <- "PSA results/misclassification_and_preventative_drug/"
+  det_output_path <- "output/deterministic_results/misclassification_and_preventative_drug/"
+  psa_output_path <- "output/psa_results/misclassification_and_preventative_drug/"
 } else if (MISCLASS) {
-  dir.create("Deterministic results/misclassification", showWarnings = FALSE, recursive = TRUE)
-  dir.create("PSA results/misclassification",           showWarnings = FALSE, recursive = TRUE)
-  det_output_path <- "Deterministic results/misclassification/"
-  psa_output_path <- "PSA results/misclassification/"
+  dir.create("output/deterministic_results/misclassification", showWarnings = FALSE, recursive = TRUE)
+  dir.create("output/psa_results/misclassification",           showWarnings = FALSE, recursive = TRUE)
+  det_output_path <- "output/deterministic_results/misclassification/"
+  psa_output_path <- "output/psa_results/misclassification/"
 } else if (PREVENTATIVE_DRUG) {
-  dir.create("Deterministic results/preventative_drug",             showWarnings = FALSE, recursive = TRUE)
-  dir.create("PSA results/misclassification_and_preventative_drug", showWarnings = FALSE, recursive = TRUE)
-  det_output_path <- "Deterministic results/preventative_drug/"
-  psa_output_path <- "PSA results/misclassification_and_preventative_drug/"
+  dir.create("output/deterministic_results/preventative_drug",             showWarnings = FALSE, recursive = TRUE)
+  dir.create("output/psa_results/misclassification_and_preventative_drug", showWarnings = FALSE, recursive = TRUE)
+  det_output_path <- "output/deterministic_results/preventative_drug/"
+  psa_output_path <- "output/psa_results/misclassification_and_preventative_drug/"
 } else {
-  dir.create("Deterministic results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
-  dir.create("PSA results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
-  det_output_path<-"Deterministic results/nomisclassification/"
-  psa_output_path<-"PSA results/nomisclassification/"
+  dir.create("output/deterministic_results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
+  dir.create("output/psa_results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
+  det_output_path<-"output/deterministic_results/nomisclassification/"
+  psa_output_path<-"output/psa_results/nomisclassification/"
 }
 
 sample_fname <- "possample"
@@ -83,13 +83,12 @@ dqset.seed(NULL)
 set.seed(NULL)
 
 # Source function files
-source("MANC_RISK_SCREEN_functions.R")
-source("risksample function.R")
-source("negsample function.R")
-source("des_vectorised_df.R")
+source("R/MancBreastScreen_functions.R")
+source("R/risksample_functions.R")
+source("R/des_vectorised_df.R")
 
 # Source fixed parameters
-source("params.R")
+source("parameters/params.R")
 
 # -----------------------------------------------------------------------------
 # Generate sample
@@ -101,19 +100,19 @@ if (controls$gensample) {
   screen_strategy <- screen_strategies[1]
 
   if (MISCLASS) {
-    dir.create("Risksamplewithmisclass", showWarnings = FALSE)
+    dir.create("output/risksample_misclass", showWarnings = FALSE, recursive = TRUE)
     create_sample_with_misclass(PSA, intervals, controls$seed, screen_strategy)
   } else {
-    dir.create("Risksample", showWarnings = FALSE)
+    dir.create("output/risksample", showWarnings = FALSE, recursive = TRUE)
     cmp_create_sample(PSA, intervals, controls$seed, screen_strategy)
   }
 }
 
 # Load sample
 if (MISCLASS) {
-  load(paste0("Risksamplewithmisclass/", sample_fname, ".Rdata"))
+  load(paste0("output/risksample_misclass/", sample_fname, ".Rdata"))
 } else {
-  load(paste0("Risksample/", sample_fname, ".Rdata"))
+  load(paste0("output/risksample/", sample_fname, ".Rdata"))
 }
 
 #Fix column names for risksample
@@ -225,7 +224,7 @@ worker_globals <- c(
   "vec_ca_survival_time", "vec_fnLookupBase",
   "vec_QALY_counter", "vec_QALY_counter_core",
   "get_screen_times", "assign_risk_groups","vec_QALY_counter_fast",
-  "negsamplefn", "redraw_drug_pars"
+  "redraw_drug_pars"
 )
 
 foreach(

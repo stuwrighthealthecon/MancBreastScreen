@@ -1,0 +1,14 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^scripts$
+^parameters$
+^analysis$
+^data-raw$
+^output$
+^docs$
+^archive$
+^_backup_pre_reorg$
+^_to_delete$
+^air\.toml$
+^CITATION\.cff$
+^README\.md$

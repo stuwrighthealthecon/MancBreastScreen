@@ -7,8 +7,8 @@ plotlist<-list()
 
 for (c in 1:calibruns){
 
-  source("MANC-RISK-SCREEN fast parallelised.R")
-  source("Analysis/Validation.R")
+  source("scripts/MancBreastScreen_parallel.R")
+  source("analysis/validation.R")
   calibresults[c,]<-c(c,gamma_mean,gamma_sd,gamma_p,lc_bump,RMSE)
   
 plotlist[[c]]<-incidenceplot

@@ -89,7 +89,7 @@ expected_prev <- .12
 
 #Read in distribution of cancer incidence by age
 Incidence_Mortality <- if (CORRECT_BC_AGE) {
-  read.csv("Data/Incidence_Mortality_ONS2.csv") %>%
+  read.csv("inst/extdata/Incidence_Mortality_ONS2.csv") %>%
     mutate(
       BC_age = expected_prev *
         Cond.on.getting.BC..prob.of.getting.cancer.at.age.t /
@@ -97,7 +97,7 @@ Incidence_Mortality <- if (CORRECT_BC_AGE) {
     ) %>%
     mutate(BC_age = replace(BC_age, age == 100, 1 - sum(BC_age[1:100])))
 } else {
-  read.csv("Data/Incidence_Mortality_ONS2.csv") %>%
+  read.csv("inst/extdata/Incidence_Mortality_ONS2.csv") %>%
     mutate(BC_age = Cond.on.getting.BC..prob.of.getting.cancer.at.age.t)
 }
 
@@ -188,7 +188,7 @@ biopsy_rate <- 0.506 #Proportion of referrals without cancer that have biopsy
 #### Drug data ####
 
 # First bring in log hazard ratios from networked analysis
-loghaz_ests <- readRDS("Data/PreventionOutputs.RDS")
+loghaz_ests <- readRDS("inst/extdata/PreventionOutputs.RDS")
 efficacy_ests <- loghaz_ests[1]
 dropout_ests <- loghaz_ests[4]
 
@@ -452,7 +452,7 @@ tblLookup$lookup_key <- paste(tblLookup$stage_flag,
 #######################Utility Weights#########################################
 
 #Set age adjusted utility values
-utility_ages <- read.csv("Data/age_related_utilities.csv")
+utility_ages <- read.csv("inst/extdata/age_related_utilities.csv")
 
 #Set time independent utility decrements
 #Utility of DCIS

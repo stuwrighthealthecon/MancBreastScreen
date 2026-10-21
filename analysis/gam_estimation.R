@@ -4,7 +4,7 @@ library("tidyverse")
 
 alternatives <- c(0, 1, 2, 3, 4, 9)
 
-filenames <- list.files("PSA results/misclassification", full.names = TRUE)
+filenames <- list.files("output/psa_results/misclassification", full.names = TRUE)
 alldata <- lapply(filenames, function(x) {
   get(load(x, .GlobalEnv))
 })
@@ -30,11 +30,11 @@ gc()
 #Save combined psaresults as backup
 save(
   psaresults,
-  file = paste("PSA results/PSA_", "psaresults", ".Rdata", sep = "")
+  file = paste("output/psa_results/PSA_", "psaresults", ".Rdata", sep = "")
 )
 
 #Remove cost variables for QALY GAM
-load(paste("PSA results/PSA_psaresults", ".Rdata", sep = ""))
+load(paste("output/psa_results/PSA_psaresults", ".Rdata", sep = ""))
 
 psaresultscan <- psaresults %>% filter(psaresults$Cancer == 1)
 
@@ -72,10 +72,10 @@ summary(modQ)
 
 #Slim down QALY GAM and save
 #modQ[2:43]<-NULL
-saveRDS(modQ, file = "GAM models/QALYmodelcan.RDS")
+saveRDS(modQ, file = "output/gam_models/QALYmodelcan.RDS")
 
 #Re-load full PSA results
-load(paste("PSA results/PSA_psaresults", ".Rdata", sep = ""))
+load(paste("output/psa_results/PSA_psaresults", ".Rdata", sep = ""))
 
 psaresultscan <- psaresults %>% filter(psaresults$Cancer == 1)
 
@@ -114,9 +114,9 @@ summary(modC)
 
 #Slim down cost GAM and save
 #modC[2:43]<-NULL
-saveRDS(modC, file = "GAM models/costmodelcan.RDS")
+saveRDS(modC, file = "output/gam_models/costmodelcan.RDS")
 
-load(paste("PSA results/PSA_psaresults", ".Rdata", sep = ""))
+load(paste("output/psa_results/PSA_psaresults", ".Rdata", sep = ""))
 
 psaresultscan <- psaresults %>% filter(psaresults$Cancer == 0)
 
@@ -154,10 +154,10 @@ summary(modQ)
 
 #Slim down QALY GAM and save
 #modQ[2:43]<-NULL
-saveRDS(modQ, file = "GAM models/QALYmodelnocan.RDS")
+saveRDS(modQ, file = "output/gam_models/QALYmodelnocan.RDS")
 
 #Re-load full PSA results
-load(paste("PSA results/PSA_psaresults", ".Rdata", sep = ""))
+load(paste("output/psa_results/PSA_psaresults", ".Rdata", sep = ""))
 
 psaresultscan <- psaresults %>% filter(psaresults$Cancer == 0)
 
@@ -196,4 +196,4 @@ summary(modC)
 
 #Slim down cost GAM and save
 #modC[2:43]<-NULL
-saveRDS(modC, file = "GAM models/costmodelnocan.RDS")
+saveRDS(modC, file = "output/gam_models/costmodelnocan.RDS")

@@ -1,12 +1,20 @@
 #Stage I to III survival parameters
-PSA_gamma_survival1 <- c(-6, -3)
-PSA_gamma_survival2 <- c(-5, -1)
-PSA_gamma_survival3 <- c(-3, -0.01)
+survmvn <- data.frame(
+  c(-5.6178, -5.2857, -6.1138),
+  c(-3.8083, -3.7400, -3.8704),
+  c(-2.7311, -2.6687, -2.7963)
+)
+survcovmat <- cov(survmvn)
+survmeans <- c(survmvn[1, 1], survmvn[1, 2], survmvn[1, 3])
 
 #Metastatic survival parameters
-PSA_meta_survival1 <- c(-2.5, -0.5)
-PSA_meta_survival2 <- c(-2, -0.3)
-PSA_meta_survival3 <- c(-1.5, -0.1)
+metmvn <- data.frame(
+  c(-1.78723, -1.67922, -1.89434),
+  c(-1.38762, -1.33512, -1.49956),
+  c(-1.01051, -0.93338, -1.08304)
+)
+metmat <- cov(metmvn)
+metmeans <- c(metmvn[1, 1], metmvn[1, 2], metmvn[1, 3])
 
 #Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
 PSA_beta1 <- c(1.47, 0.1)
@@ -24,15 +32,13 @@ PSA_MRI_cdr <- c(99.495, 19799.5)
 PSA_US_cdr <- c(35.89, 11927)
 
 #Draw tumour growth rate parameters
-PSA_log_norm_mean <- c(0.8, 1.2)
+PSA_log_norm_mean <- c(1.07, 0.09)
 PSA_log_norm_sd <- c(1.31, 0.11)
 
 # Chemoprevention Drug parameters
 
 # First bring in log hazard ratios from networked analysis
-loghaz_ests <- readRDS("Data/PreventionOutputs.RDS")
-efficacy_ests <- loghaz_ests[1]
-dropout_ests <- loghaz_ests[4]
+loghaz_ests <- readRDS("inst/extdata/PreventionOutputs.RDS")
 
 # Extract parameters for multivariate normal draws
 efficacy_mu <- efficacy_ests$AnyBC$means %>% as.numeric()
@@ -46,8 +52,8 @@ PSA_uptake_2 <- c(.71, .1)
 
 #Draw costs
 PSA_cost_strat <- c(1.8826894, 0.1015175)
-cost_inflator <- 0.2
-cost_dist_sd <- 0.1020408
+cost_inflator <- 0.1
+cost_dist_sd <- 0.05102041
 PSA_costvar <- c(0, cost_dist_sd)
 PSA_costscreen <- c(0, cost_dist_sd)
 PSA_cost_follow_up <- c(0, cost_dist_sd)
@@ -57,5 +63,10 @@ PSA_cost_MRI <- c(0, cost_dist_sd)
 PSA_cost_drug <- c(0, cost_dist_sd)
 
 #Generate utility draws
-PSA_util_1 <- c(0.6, 0.9)
-PSA_util_4 <- c(0.5, 0.8)
+utilmat <- data.frame(
+  c(1 - 0.82, 1 - 0.81, 1 - 0.83),
+  c(1 - 0.75, 1 - 0.73, 1 - 0.77)
+)
+lnutilmat <- log(utilmat)
+covutil <- cov(lnutilmat)
+utilmeans <- c(log(1 - 0.82), log(1 - 0.75))

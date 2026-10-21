@@ -211,13 +211,13 @@ for (m in unique(supp_data$Model_age)) {
 }
 
 if (SAVE_OUTPUTS) {
-  save(beta_fits_df, file = "fitted_risk_distributions.csv")
+  save(beta_fits_df, file = "output/fitted_risk_distributions.csv")
 }
 
 
 #### Next problem: inferring life risk from ten year risk
 
-risk_mat <- read.csv("mancriskscreen/Data/synthetic_risk_data.csv") %>%
+risk_mat <- read.csv("inst/extdata/synthetic_risk_data.csv") %>%
   dplyr::select(-"X")
 
 risk_mat$syn.X10yr <- .01 * risk_mat$syn.X10yr # Rescale to numbers rather than percentages
@@ -380,5 +380,5 @@ if (SHOW_PLOTS) {
 risk_mat_with_mc[, c(2, 3, 5, 6)] <- 100 * risk_mat_with_mc[, c(2, 3, 5, 6)]
 
 if (SAVE_OUTPUTS) {
-  write.csv(risk_mat_with_mc, "synthetic_risk_data_with_misclassification.csv")
+  write.csv(risk_mat_with_mc, "output/synthetic_risk_data_with_misclassification.csv")
 }
