@@ -28,15 +28,17 @@ Imports:
     dqrng,
     dplyr,
     foreach,
+    here,
     iterators,
     MASS,
     matrixStats,
     purrr,
-    tidyr
+    parallel,
+    tidyr,
+    utils
 Suggests:
     GauPro,
     gt,
-    here,
     magrittr,
     mgcv,
     pacman,

@@ -1,7 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^scripts$
-^parameters$
 ^analysis$
 ^data-raw$
 ^output$

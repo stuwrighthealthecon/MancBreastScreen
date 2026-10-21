@@ -16,10 +16,10 @@ alternative <- c(0, 1, 2, 3, 4, 9)
 wtp <- seq(from = 0, to = 50000, by = 1000)
 
 #Load GAMs
-modQ <- readRDS("output/gam_models/QALYmodelcan.RDS")
-modQ2 <- readRDS("output/gam_models/QALYmodelnocan.RDS")
-modC <- readRDS("output/gam_models/costmodelcan.RDS")
-modC2 <- readRDS("output/gam_models/costmodelnocan.RDS")
+modQ <- readRDS(here::here("output", "gam_models", "QALYmodelcan.RDS"))
+modQ2 <- readRDS(here::here("output", "gam_models", "QALYmodelnocan.RDS"))
+modC <- readRDS(here::here("output", "gam_models", "costmodelcan.RDS"))
+modC2 <- readRDS(here::here("output", "gam_models", "costmodelnocan.RDS"))
 
 #Draw stage I to III survival parameters
 survmvn <- data.frame(
@@ -209,7 +209,7 @@ plot(
 #Creat PSA results table and save
 psa_sum <- summary(psa_obj, calc_sds = TRUE)
 psa_sum
-write.csv(psa_sum, file = "output/psa results summary.csv")
+write.csv(psa_sum, file = here::here("output", "psa results summary.csv"))
 
 #Plot cost-effectiveness plane for PSA results
 icers <- calculate_icers(

@@ -1,3 +1,36 @@
+###############Generalised gamma distribution helpers##########################
+##############Used to sample the age of tumour genesis########################
+rgengamma_custom <- function(n, p, scale, k) {
+  scale * rgamma(n, shape = k, rate = 1)^(1 / p)
+}
+
+# Solve for (k, scale) that hit a target mean/sd for a CHOSEN p
+get_gengamma_params <- function(target_mean, target_sd, p) {
+  target_cv2 <- (target_sd / target_mean)^2
+  
+  cv2_given_k <- function(k) {
+    m1 <- exp(lgamma(k + 1/p) - lgamma(k))
+    m2 <- exp(lgamma(k + 2/p) - lgamma(k))
+    (m2 - m1^2) / m1^2 - target_cv2
+  }
+  
+  k <- uniroot(cv2_given_k, interval = c(1e-4, 1e4))$root
+  m1 <- exp(lgamma(k + 1/p) - lgamma(k))
+  scale <- target_mean / m1
+  
+  list(p = p, scale = scale, k = k)
+}
+
+# CDF: P(X <= x) = P(G <= (x/scale)^p)
+pgengamma_custom <- function(x, p, scale, k, lower.tail = TRUE, log.p = FALSE) {
+  pgamma((x / scale)^p, shape = k, rate = 1, lower.tail = lower.tail, log.p = log.p)
+}
+
+# Quantile function: invert the same transform
+qgengamma_custom <- function(prob, p, scale, k, lower.tail = TRUE, log.p = FALSE) {
+  scale * qgamma(prob, shape = k, rate = 1, lower.tail = lower.tail, log.p = log.p)^(1 / p)
+}
+
 #################Compute strategy-dependent drug matrices###################
 ##################Used for prevantative drugs############################
 get_drug_matrices <- function(screen_strategy) {
