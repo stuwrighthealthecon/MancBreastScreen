@@ -38,16 +38,17 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
   #If risk-stratified screening used then determine if each woman chooses to have
   #risk predicted, attends risk consultation, and changes interval
 
-  risksample$risk_predicted <- rbinom(length(nrow(risksample)), 1, risk_uptake)
+  # One draw per woman (length(nrow(...)) was 1, so everyone shared one draw)
+  risksample$risk_predicted <- rbinom(nrow(risksample), 1, risk_uptake)
   risksample$feedback <- ifelse(
     risksample$risk_predicted == 1 &
-      rbinom(length(nrow(risksample)), 1, (risk_feedback)) == 1,
+      rbinom(nrow(risksample), 1, (risk_feedback)) == 1,
     1,
     0
   )
   risksample$interval_change <- ifelse(
     risksample$feedback == 1 &
-      rbinom(length(nrow(risksample)), 1, risk_feedback) == 1,
+      rbinom(nrow(risksample), 1, risk_feedback) == 1,
     1,
     0
   )
@@ -62,7 +63,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     risksample$life_expectancy <= start_age,
     qweibull(
       p = dqrunif(
-        n = 1,
+        n = nrow(risksample),   # one redraw per woman (was n = 1: same age for all)
         min = pweibull(
           q = start_age,
           shape = acmmortality_wb_a,
@@ -84,7 +85,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
 
   #Determine if a cancer will develop
   risksample$cancer <- ifelse(
-    dqrunif(length(risksample$cancer), 0, 1) < (risksample$liferisk / 100),
+    dqrunif(length(risksample$cancer), 0, 1) < ((risksample$liferisk+lc_bump) / 100),
     1,
     0
   )
@@ -105,36 +106,42 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       sdlog = sqrt(log_norm_sd)
     )
   
-  #Vectorised cancer incidence age assignment
-  age_cols <- Incidence_Mortality$age
-  
-  # Create matrix of likelihood of cancer by age, bound by individual life expectancy
-  age_mat  <- outer(rep(1, nrow(risksample)), Incidence_Mortality$BC_age) *
-    (outer(risksample$life_expectancy, age_cols, FUN = ">"))
-  age_mat  <- age_mat / rowSums(age_mat)
-  
-  #Create cumulative risk of cancer by age
-  cum_age_mat <- matrixStats::rowCumsums(age_mat) 
-  
-  #Create vector of random draws
-  
-  u_age       <- dqrunif(nrow(risksample), 0, 1)
-  
-  #Find column at which random draw exceeds cumulative cancer risk
-  col_idx     <- rowSums(cum_age_mat < u_age) + 1L
-  col_idx     <- pmin(col_idx, length(age_cols))
-  risksample$ca_incidence <- age_cols[col_idx]
-  
-  # Add fractional month jitter
-  risksample$ca_incidence <- risksample$ca_incidence + dqrunif(nrow(risksample), 0, 1)
-  
   # Tumour size and genesis age
-  risksample$clin_detect_size_g <- start_size * 2^risksample$clinical_detect_size
+  risksample$clin_detect_size_g <- pmin(
+    start_size * 2^risksample$clinical_detect_size,
+    max_size * 0.999
+  )
   
-  t_gen <- ((log((Vm / Vc)^0.25 - 1) -
-               log((Vm / ((4/3) * pi * (risksample$clin_detect_size_g / 2)^3))^0.25 - 1)) /
-              (0.25 * risksample$growth_rate))
-  risksample$genage <- risksample$ca_incidence - t_gen
+  #Sample genesis age
+  upper_limit<-pgengamma_custom(risksample$life_expectancy-18,
+                            p=gengammaparams$p,
+                            scale=gengammaparams$scale,
+                            k=gengammaparams$k)
+  u <- runif(nrow(risksample)) * upper_limit
+  risksample$genage <- 18+qgengamma_custom(u, 
+                                        p = gengammaparams$p, 
+                                        scale = gengammaparams$scale,
+                                        k = gengammaparams$k)
+  
+  t_gen <- rep(NA_real_, nrow(risksample))
+  has_cancer <- risksample$cancer == 1
+  
+  t_gen[has_cancer] <- (
+    log((Vm / Vc)^0.25 - 1) -
+      log((Vm / ((4/3) * pi * (risksample$clin_detect_size_g[has_cancer] / 2)^3))^0.25 - 1)
+  ) / (0.25 * risksample$growth_rate[has_cancer])
+  
+  risksample$ca_incidence<-risksample$genage+t_gen
+
+  # Women without cancer go through the same DES: give them no tumour and no
+  # clinical diagnosis. Inf (not NA) so age comparisons in the DES stay TRUE/FALSE.
+  no_ca <- risksample$cancer == 0
+  risksample$genage[no_ca]       <- Inf
+  risksample$ca_incidence[no_ca] <- Inf
+  risksample$growth_rate[no_ca]  <- 0
+  
+  # Individual screening-invitation jitter (months -> years), applied to whole schedule
+  risksample$invite_jitter_years <- runif(nrow(risksample), 0, 35.99) / 12
 
   if (PSA == 1) {
     if (intervals == 0) {
@@ -351,25 +358,19 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     colnames(masterframe)[1:n_risk_cols] <- colnames(risksample)
     colnames(masterframe)[(n_risk_cols + 1):(n_risk_cols + n_psa_cols)] <- colnames(PSA_all_p)
 
-    #Split the dataframe into chunks for easier computation
+    #Keep women alive at screening start; everyone (with and without cancer)
+    #is saved in one sample and run through the DES
     risksample <- masterframe %>% filter(masterframe$life_expectancy >= screen_startage)
-
-    negsample <- masterframe %>% filter(masterframe$cancer == 0)
-    save(negsample, file = paste("Risksample/negsample.Rdata", sep = ""))
-    risksample <- masterframe %>% filter(masterframe$cancer == 1)
-    save(risksample,file=paste("Risksample/possample.Rdata"))
-    risksample<-masterframe
+    save(risksample, file = "Risksample/possample.Rdata")
     #Clean up redundant inputs
     rm(masterframe, PSA_all_p, risk_mat)
     gc()
 
   } else {
+    #Keep women alive at screening start; everyone (with and without cancer)
+    #is saved in one sample and run through the DES
     risksample <- risksample %>% filter(risksample$life_expectancy >= screen_startage)
-
-    negsample <- risksample %>% filter(risksample$cancer == 0)
-    save(negsample, file = paste("Risksample/negsample.Rdata", sep = ""))
-    risksample <- risksample %>% filter(risksample$cancer == 1)
-    save(risksample,file=paste("Risksample/possample.Rdata"))
+    save(risksample, file = "Risksample/possample.Rdata")
   }
 }
 
@@ -448,7 +449,7 @@ create_sample_with_misclass <- function(
     risksample$life_expectancy <= start_age,
     qweibull(
       p = dqrunif(
-        n = 1,
+        n = nrow(risksample),   # one redraw per woman (was n = 1: same age for all)
         min = pweibull(
           q = start_age,
           shape = acmmortality_wb_a,
@@ -469,7 +470,7 @@ create_sample_with_misclass <- function(
   )
   #Determine if a cancer will develop
   risksample$cancer <- ifelse(
-    dqrunif(length(risksample$cancer), 0, 1) < (risksample$liferisk_true / 100),
+    dqrunif(length(risksample$cancer), 0, 1) < ((risksample$liferisk_true+lc_bump) / 100),
     1,
     0
   )
@@ -490,37 +491,59 @@ create_sample_with_misclass <- function(
       sdlog = sqrt(log_norm_sd)
     )
   
-  #Vectorised cancer incidence age assignment
-  age_cols <- Incidence_Mortality$age
+  #Set clinical detection size for cancer
+  risksample$clinical_detect_size <- risksample$cancer *
+    (dqrnorm(
+      n = length(risksample$cancer),
+      mean = clin_detection_m,
+      sd = clin_detection_sd
+    ))
   
-  # Create matrix of likelihood of cancer by age, bound by individual life expectancy
-  age_mat  <- outer(rep(1, nrow(risksample)), Incidence_Mortality$BC_age) *
-    (outer(risksample$life_expectancy, age_cols, FUN = ">"))
-  age_mat  <- age_mat / rowSums(age_mat)
+  #Set growth rate
+  risksample$growth_rate <- risksample$cancer *
+    qlnorm(
+      dqrunif(length(risksample$cancer), 0, 1),
+      meanlog = log_norm_mean,
+      sdlog = sqrt(log_norm_sd)
+    )
   
-  #Create cumulative risk of cancer by age
-  cum_age_mat <- matrixStats::rowCumsums(age_mat) 
-  
-  #Create vector of random draws
-  
-  u_age       <- dqrunif(nrow(risksample), 0, 1)
-  
-  #Find column at which random draw exceeds cumulative cancer risk
-  col_idx     <- rowSums(cum_age_mat < u_age) + 1L
-  col_idx     <- pmin(col_idx, length(age_cols))
-  risksample$ca_incidence <- age_cols[col_idx]
-  
-  # Add fractional month jitter
-  risksample$ca_incidence <- risksample$ca_incidence + dqrunif(nrow(risksample), 0, 1)
+  #Sample genesis age
+  upper_limit<-pgengamma_custom(risksample$life_expectancy-18,
+                                p=gengammaparams$p,
+                                scale=gengammaparams$scale,
+                                k=gengammaparams$k)
+  u <- runif(nrow(risksample)) * upper_limit
+  risksample$genage <- 18+qgengamma_custom(u, 
+                                        p=gengammaparams$p,
+                                        scale=gengammaparams$scale,
+                                        k=gengammaparams$k)
   
   # Tumour size and genesis age
-  risksample$clin_detect_size_g <- start_size * 2^risksample$clinical_detect_size
+  risksample$clin_detect_size_g <- pmin(
+    start_size * 2^risksample$clinical_detect_size,
+    max_size * 0.999
+  )
   
-  t_gen <- ((log((Vm / Vc)^0.25 - 1) -
-               log((Vm / ((4/3) * pi * (risksample$clin_detect_size_g / 2)^3))^0.25 - 1)) /
-              (0.25 * risksample$growth_rate))
-  risksample$genage <- risksample$ca_incidence - t_gen
+  t_gen <- rep(NA_real_, nrow(risksample))
+  has_cancer <- risksample$cancer == 1
+  
+  t_gen[has_cancer] <- (
+    log((Vm / Vc)^0.25 - 1) -
+      log((Vm / ((4/3) * pi * (risksample$clin_detect_size_g[has_cancer] / 2)^3))^0.25 - 1)
+  ) / (0.25 * risksample$growth_rate[has_cancer])
+  
+  risksample$ca_incidence<-risksample$genage+t_gen
 
+  # Women without cancer go through the same DES: give them no tumour and no
+  # clinical diagnosis. Inf (not NA) so age comparisons in the DES stay TRUE/FALSE.
+  no_ca <- risksample$cancer == 0
+  risksample$genage[no_ca]       <- Inf
+  risksample$ca_incidence[no_ca] <- Inf
+  risksample$growth_rate[no_ca]  <- 0
+  
+  # Individual screening-invitation jitter (months -> years), applied to whole schedule
+  risksample$invite_jitter_years <- runif(nrow(risksample), 0, 35.99) / 12
+  
   if (PSA == 1) {
     if (intervals == 0) {
       #########################Add Monte Carlo Draws into Sample##############
@@ -736,17 +759,10 @@ create_sample_with_misclass <- function(
     colnames(masterframe)[1:n_risk_cols] <- colnames(risksample)
     colnames(masterframe)[(n_risk_cols + 1):(n_risk_cols + n_psa_cols)] <- colnames(PSA_all_p)
 
-    #Split the dataframe into chunks for easier computation
+    #Keep women alive at screening start; everyone (with and without cancer)
+    #is saved in one sample and run through the DES
     risksample <- masterframe %>% filter(masterframe$life_expectancy >= screen_startage)
-
-    negsample <- masterframe %>% filter(masterframe$cancer == 0)
-    save(
-      negsample,
-      file = paste("Risksamplewithmisclass/negsample.Rdata", sep = "")
-    )
-    risksample<- masterframe %>% filter(masterframe$cancer == 1)
-    save(risksample,file=paste("Risksamplewithmisclass/possample.Rdata"))
-    risksample<-masterframe
+    save(risksample, file = "Risksamplewithmisclass/possample.Rdata")
     #Clean up redundant inputs
     rm(masterframe, PSA_all_p, risk_mat)
     gc()
@@ -754,14 +770,10 @@ create_sample_with_misclass <- function(
 
   } else {
     
+    #Keep women alive at screening start; everyone (with and without cancer)
+    #is saved in one sample and run through the DES
     risksample <- risksample %>% filter(risksample$life_expectancy >= screen_startage)
-    negsample <- risksample %>% filter(risksample$cancer == 0)
-    save(
-      negsample,
-      file = paste("Risksamplewithmisclass/negsample.Rdata", sep = "")
-    )
-    risksample<- risksample %>% filter(risksample$cancer == 1)
-    save(risksample,file=paste("Risksamplewithmisclass/possample.Rdata"))
+    save(risksample, file = "Risksamplewithmisclass/possample.Rdata")
     }
   }
 

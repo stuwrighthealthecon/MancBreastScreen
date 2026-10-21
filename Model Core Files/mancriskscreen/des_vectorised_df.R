@@ -7,7 +7,7 @@ run_des_vectorised <- function(risk_df,
                                start_age,
                                screen_startage,
                                discount_cost,
-                               recall_rate,
+                               fp_rate,
                                Vm, Vc,
                                cost_screen, cost_strat, cost_US,
                                cost_MRI, cost_follow_up, cost_biop,
@@ -20,56 +20,67 @@ run_des_vectorised <- function(risk_df,
                                uptake,
                                persistence) {
   
-  # 0a. Initialise working data.frame and extract per-woman screen schedules
-  df <- risk_df
-  n  <- nrow(df)
+  # 0a. Initialise working list and extract per-woman screen schedules
+  df <- as.list(risk_df)
+  n  <- nrow(risk_df)  
   
   df$Mort_age <- df$life_expectancy
   df$CD_age   <- df$ca_incidence
   df$CD_size  <- df$clin_detect_size_g
   
+  df$life_expectancy   <- NULL
+  df$ca_incidence       <- NULL
+  df$clin_detect_size_g <- NULL
+  
   screen_cols <- grep("^screen_", names(df), value = TRUE)
   screen_cols <- screen_cols[order(as.integer(sub("screen_", "", screen_cols)))]
   
-  screen_mat                  <- t(t(as.matrix(df[, screen_cols])) * screen_times)
+  attendance_mat <- do.call(cbind, df[screen_cols]) 
+  
+  # Each woman's own schedule: base screen_times shifted by her personal jitter
+  jittered_times <- outer(df$invite_jitter_years, screen_times, FUN = "+")
+  
+  screen_mat  <- jittered_times * attendance_mat   # 0 where she didn't attend
   max_screens <- ncol(screen_mat)
-  screen_mat[screen_mat == 0] <- NA_real_
-  df[, screen_cols] <- NULL
+  screen_mat[attendance_mat == 0] <- NA_real_
+  if (screen_strategy == 0) screen_mat[] <- NA_real_   # no screening: no screen events
+  df[screen_cols] <- NULL 
   
-  # 0b. Initialise state and counter columns
-  df$age                  <- start_age
-  df$active               <- TRUE #Is person active in simulation (alive and cancer free)
-  df$interval_ca          <- 0L #Interval cancer detected
-  df$screen_detected_ca   <- 0L #Cancer found by screening
-  df$screen_count         <- 0L #Number of screens (mammo) attended
-  df$US_count             <- 0L #Number of ultrasounds attended
-  df$MRI_count            <- 0L #Number of MRIs attended
-  df$recall_count         <- 0L #Number of false-positive results
-  df$lastscreen_count     <- 0L #Last screen attended
-  df$sdfirst_cancer       <- 0L #Cancer found at first screen
-  df$sdlast_cancer        <- 0L #Cancer found at last screen
+  # 0b. Initialise state and counter columns (full length: df is a list, so scalars don't recycle)
+  df$age                  <- rep(start_age, n)
+  df$active               <- rep(TRUE, n)   #Is person active in simulation (alive and cancer free)
+  df$interval_ca          <- integer(n)     #Interval cancer detected
+  df$screen_detected_ca   <- integer(n)     #Cancer found by screening
+  df$screen_count         <- integer(n)     #Number of screens (mammo) attended
+  df$US_count             <- integer(n)     #Number of ultrasounds attended
+  df$MRI_count            <- integer(n)     #Number of MRIs attended
+  df$recall_count         <- integer(n)     #Number of false-positive results
+  df$biopsy_count         <- integer(n)     #Number of biopsies following false positives
+  df$lastscreen_count     <- integer(n)     #Last screen attended
+  df$sdfirst_cancer       <- integer(n)     #Cancer found at first screen
+  df$sdlast_cancer        <- integer(n)     #Cancer found at last screen
   
-  df$costs                <- 0.0 #Total cost counter
-  df$drug_costs           <- 0.0 #Preventative drug cost counter
-  df$US_costs             <- 0.0 #Ultrasound cost counter
-  df$MRI_costs            <- 0.0 #MRI cost counter
-  df$costs_follow_up      <- 0.0 #Follow-up cost counter
+  df$costs                <- numeric(n)     #Total cost counter
+  df$drug_costs           <- numeric(n)     #Preventative drug cost counter
+  df$US_costs             <- numeric(n)     #Ultrasound cost counter
+  df$MRI_costs            <- numeric(n)     #MRI cost counter
+  df$costs_follow_up      <- numeric(n)     #Follow-up cost counter
   
-  df$cd_age_record        <- NA_real_ #Cancer diagnosis age
-  df$cd_stage             <- NA_real_ #Cancer stage
-  df$cd_size              <- NA_real_ #Cancer size
-  df$cd_screen_flag       <- NA_integer_ 
-  df$cd_screen_sens       <- NA_real_ #Screen sensitivity (based on size)
-  df$cd_screen_spec       <- NA_real_ #Screen specificity
-  df$cd_death_age         <- NA_real_ #Cancer death age
-  df$cd_screen_number     <- NA_integer_ #Screen at which cancer found
+  df$cd_age_record        <- rep(NA_real_, n)    #Cancer diagnosis age
+  df$cd_stage             <- rep(NA_real_, n)    #Cancer stage
+  df$cd_size              <- rep(NA_real_, n)    #Cancer size
+  df$cd_screen_flag       <- rep(NA_integer_, n)
+  df$cd_screen_sens       <- rep(NA_real_, n)    #Screen sensitivity (based on size)
+  df$cd_screen_spec       <- rep(NA_real_, n)    #Screen specificity
+  df$cd_death_age         <- rep(NA_real_, n)    #Cancer death age
+  df$cd_screen_number     <- rep(NA_integer_, n) #Screen at which cancer found
   
-  df$Ca_mort_age          <- df$Mort_age #Cancer death age
-  df$incidence_age_record <- NA_real_ #Cancer diagnosis age
-  df$stage_cat            <- NA_real_ #Cancer stage
-  df$Ca_size_screen       <- NA_real_ #Cancer size at screen
-  df$LY_counter           <- NA_real_ #Life year counter
-  df$QALY_counter         <- NA_real_ #QALY counter
+  df$Ca_mort_age          <- df$Mort_age         #Cancer death age
+  df$incidence_age_record <- rep(NA_real_, n)    #Cancer diagnosis age
+  df$stage_cat            <- rep(NA_real_, n)    #Cancer stage
+  df$Ca_size_screen       <- rep(NA_real_, n)    #Cancer size at screen
+  df$LY_counter           <- rep(NA_real_, n)    #Life year counter
+  df$QALY_counter         <- rep(NA_real_, n)    #QALY counter
   
   # Pre-calculate discount lookup vector
   max_age     <- ceiling(max(df$Mort_age))
@@ -116,6 +127,7 @@ run_des_vectorised <- function(risk_df,
     if (any(death_idx)) {
       df$active[death_idx]        <- FALSE
       df$cd_age_record[death_idx] <- df$Mort_age[death_idx]
+      df$cd_death_age[death_idx]  <- df$Mort_age[death_idx]
     }
     
     # 2b. Did anyone have an interval cancer detected before this screen?
@@ -317,14 +329,20 @@ run_des_vectorised <- function(risk_df,
     #False-positive recalls
     fp_idx     <- act_idx & df$screen_detected_ca == 0L
     fp_draw    <- dqrunif(n, 0, 1)
-    recall_idx <- fp_idx & fp_draw < recall_rate
-    
+    fp_idx <- fp_idx & fp_draw < fp_rate[df$VDG]
+
+    #Individual random draw for biopsy among women recalled
+    biopsy_draw <- dqrunif(n, 0, 1)
+    biopsy_idx  <- fp_idx & biopsy_draw < biopsy_rate
+
     #Add false-positive costs and add to counters
-    if (any(recall_idx)) {
-      fp_cost <- (cost_follow_up + biopsy_rate * cost_biop) * disc_screen[recall_idx]
-      df$recall_count[recall_idx]    <- df$recall_count[recall_idx]    + 1L
-      df$costs[recall_idx]           <- df$costs[recall_idx]           + fp_cost
-      df$costs_follow_up[recall_idx] <- df$costs_follow_up[recall_idx] + fp_cost
+    if (any(fp_idx)) {
+      fp_cost <- (cost_follow_up + biopsy_idx[fp_idx] * cost_biop) *
+        disc_screen[fp_idx]
+      df$fp_count[fp_idx]    <- df$fp_count[fp_idx]    + 1L
+      df$biopsy_count[biopsy_idx]    <- df$biopsy_count[biopsy_idx]    + 1L
+      df$costs[fp_idx]           <- df$costs[fp_idx]           + fp_cost
+      df$costs_follow_up[fp_idx] <- df$costs_follow_up[fp_idx] + fp_cost
     }
     
     #Update column of active women in simulation
@@ -392,21 +410,22 @@ run_des_vectorised <- function(risk_df,
   
   # 3b. Cancer-free deaths
   df$cd_age_record[df$active] <- df$Mort_age[df$active]
-  
+  df$cd_death_age[df$active]  <- df$Mort_age[df$active]
+
+  # Other-cause death still applies after a cancer diagnosis
+  df$Ca_mort_age <- pmin(df$Ca_mort_age, df$Mort_age)
+
   # 4. QALY and life-year calculations
   df$LY_counter <- df$Ca_mort_age - start_age
   
-  #Create warning if women never had cancer in the simulation
   no_cancer <- is.na(df$incidence_age_record)
   if (any(no_cancer)) {
-    warning(paste(sum(no_cancer), "women have NA incidence_age_record after",
-                  "event loop — check CD_age and genage values for these rows."))
     df$incidence_age_record[no_cancer] <- 0
     df$stage_cat[no_cancer]            <- 1L
   }
   
   #Run QALY counter
-  df$QALY_counter <- vec_QALY_counter(
+  df$QALY_counter <- vec_QALY_counter_fast(     
     df$Ca_mort_age,
     df$incidence_age_record,
     df$stage_cat
@@ -480,15 +499,12 @@ run_des_vectorised <- function(risk_df,
     results <- cbind(results, risk_df[, psa_col_names])
   }
   
-  if (PSA == 0) {
-    save(results,
-         file = paste(det_output_path, "Determ_", screen_strategy, "_", ii,
-                      ".Rdata", sep = ""))
+  out_file <- if (PSA == 0) {
+    paste0(det_output_path, "Determ_", screen_strategy, "_", ii, ".rds")
   } else {
-    save(results,
-         file = paste(psa_output_path, "PSA_", screen_strategy, "_", ii,
-                      ".Rdata", sep = ""))
+    paste0(psa_output_path, "PSA_", screen_strategy, "_", ii, ".rds")
   }
+  saveRDS(results, file = out_file, compress = FALSE)
   
   return(results)
 }

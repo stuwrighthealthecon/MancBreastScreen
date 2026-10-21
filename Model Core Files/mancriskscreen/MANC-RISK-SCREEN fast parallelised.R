@@ -15,9 +15,9 @@ library(matrixStats)
 #Set model controls
 #-----------------------------------------------------------------------------
 controls <- list(
-  strategies       = c(3), #vector of strategies to simulate
+  strategies       = c(0,1,2,3,4,9), #vector of strategies to simulate
   gensample        = TRUE, #create new sample to simulate?
-  MISCLASS         = TRUE, #should error in risk prediction be included?
+  MISCLASS         = FALSE, #should error in risk prediction be included?
   PREVENTATIVE_DRUG = FALSE, #should risk reducing medicines be used for high risk?
   supplemental_screening = FALSE, #should ultrasound and MRI be used as supplemental screening?
   PSA              = FALSE, #run PSA?
@@ -34,9 +34,7 @@ PSA               <- as.integer(controls$PSA)
 intervals         <- as.integer(controls$intervals)
 
 #Place control on number of cores for memory management at large sample sizes
-controls$n_cores <- if (controls$desired_cases >= 200000) 3L else
-  if (controls$desired_cases >= 100000) 6L else
-    max(1L, parallel::detectCores() - 1L)
+controls$n_cores <- min(length(controls$strategies), max(1L, parallel::detectCores() - 1L))
 
 # -----------------------------------------------------------------------------
 # Set output directories
@@ -61,6 +59,11 @@ if (MISCLASS & PREVENTATIVE_DRUG) {
   dir.create("PSA results/misclassification_and_preventative_drug", showWarnings = FALSE, recursive = TRUE)
   det_output_path <- "Deterministic results/preventative_drug/"
   psa_output_path <- "PSA results/misclassification_and_preventative_drug/"
+} else {
+  dir.create("Deterministic results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
+  dir.create("PSA results/nomisclassification", showWarnings = FALSE, recursive = TRUE)
+  det_output_path<-"Deterministic results/nomisclassification/"
+  psa_output_path<-"PSA results/nomisclassification/"
 }
 
 sample_fname <- "possample"
@@ -76,7 +79,8 @@ mcruns        <- controls$mcruns
 inum <- ceiling(desired_cases / expected_prev)
 
 #Set seed for dq based random number generators
-dqset.seed(controls$seed)
+dqset.seed(NULL)
+set.seed(NULL)
 
 # Source function files
 source("MANC_RISK_SCREEN_functions.R")
@@ -161,6 +165,17 @@ if (MISCLASS) {
 }
 splitmaster_base <- risksample_master[, !names(risksample_master) %in% drop_cols_now]
 
+keep <- c("risk_group", "VDG", "MRI_screen", "US_screen", "risk_predicted", "interval_change",
+          "life_expectancy", "ca_incidence", "clin_detect_size_g", "genage", "growth_rate",
+          "invite_jitter_years", "tenyrrisk", "tenyrrisk_est", "tenyrrisk_true",
+          "starting_menses_status", "time_taking_drug", grep("^PSA_|^mcid$", names(splitmaster_base), value = TRUE))
+splitmaster_base <- splitmaster_base[, intersect(keep, names(splitmaster_base))]
+
+for (nm in c("risk_group", "VDG", "MRI_screen", "US_screen", "risk_predicted", "interval_change"))
+  if (nm %in% names(splitmaster_base)) splitmaster_base[[nm]] <- as.integer(splitmaster_base[[nm]])
+
+
+
 if (PSA == 0L) {
   psa_cols     <- grep("^PSA_", names(splitmaster_base), value = TRUE)
   splitmaster_base <- splitmaster_base[, !names(splitmaster_base) %in% psa_cols]
@@ -190,7 +205,7 @@ worker_globals <- c(
   "density_cutoff", "ca_size_cut",
   "log_norm_mean", "log_norm_sd",
   "Vc", "Vm", "start_size", "max_size",
-  "recall_rate", "biopsy_rate",
+  "fp_rate", "biopsy_rate",
   "risk_cutoffs_procas", "risk_cutoffs_tert", "low_risk_cut",
   "cost_strat", "cost_screen", "cost_follow_up", "cost_biop",
   "cost_DCIS", "cost_US", "cost_MRI", "cost_drug",
@@ -209,7 +224,7 @@ worker_globals <- c(
   "run_des_vectorised", "vec_stage_by_size", "vec_screening_result",
   "vec_ca_survival_time", "vec_fnLookupBase",
   "vec_QALY_counter", "vec_QALY_counter_core",
-  "get_screen_times", "assign_risk_groups",
+  "get_screen_times", "assign_risk_groups","vec_QALY_counter_fast",
   "negsamplefn", "redraw_drug_pars"
 )
 
@@ -304,11 +319,6 @@ foreach(
     }
 
     # ---- Cap incidence and life expectancy ----------------------------------
-    risksample$ca_incidence <- ifelse(
-      risksample$life_expectancy <= risksample$ca_incidence,
-      floor(risksample$life_expectancy),
-      risksample$ca_incidence
-    )
     risksample$life_expectancy <- ifelse(
       risksample$life_expectancy >= time_horizon,
       99.99,
@@ -403,7 +413,7 @@ foreach(
       start_age          = start_age,
       screen_startage    = screen_startage,
       discount_cost      = discount_cost,
-      recall_rate        = recall_rate,
+      fp_rate        = fp_rate,
       Vm                 = Vm,
       Vc                 = Vc,
       cost_screen        = cost_screen,
@@ -433,9 +443,6 @@ foreach(
       stop(e)
     })
   } # end ii loop
-
-  #Run the model for people without cancer
-  negsamplefn(screen_strategy, MISCLASS, PSA)
   
   message(paste("Strategy", r, "complete"))
 

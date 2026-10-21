@@ -1,10 +1,8 @@
 library(tidyverse)
 
 #Load data
-filenames <- list.files(det_output_path, full.names = TRUE)
-alldata <- lapply(filenames, function(x) {
-  get(load(x, .GlobalEnv))
-})
+filenames <- list.files(det_output_path, pattern = "\\.rds$", full.names = TRUE)
+alldata   <- do.call(rbind, lapply(filenames, readRDS))
 detresults <- as.data.frame(do.call("rbind", alldata))
 
 #Create data.frame of screen and clinically detected cancers
@@ -15,7 +13,7 @@ clindet <- detresults %>% filter(detresults$`screen detected` == 0 & detresults$
 screen_stage_props<-data.frame("Names"=c("I","II","III","IV","DCIS"),
                                "Predicted"=c(tabulate(screendet$Stage)/sum(tabulate(screendet$Stage))),
                                "Observed"=c(0.4020,0.2310,0.1310,0.0240,0.2120))
-
+view(all_stage_props)
 #Caluclate Distribution of Stages of all cancers
 all_stage_props<-data.frame("Names"=c("I","II","III","IV","DCIS"),
                             "Predicted"=c(tabulate(detresults$Stage)/sum(tabulate(detresults$Stage))),
@@ -26,9 +24,9 @@ cancer_sizes<-data.frame("Detection"=c("Screen Detected","Clinically Detected"),
                          "Size"=c(mean(screendet$`Cancer Size`),mean(clindet$`Cancer Size`)))
 
 #Plot cancer detection sizes
-plot(density(clindet$`Cancer Size`),col="black",main="Size of Cancers Detected",xlab="Diameter (mm)",ylim=c(0,0.08))
-lines(density(screendet$`Cancer Size`),col="blue")
-legend("right",legend=c("Clinically Detected","Screen Detected"),fill=c("black","blue"))
+#plot(density(clindet$`Cancer Size`),col="black",main="Size of Cancers Detected",xlab="Diameter (mm)",ylim=c(0,0.08))
+#lines(density(screendet$`Cancer Size`),col="blue")
+#legend("right",legend=c("Clinically Detected","Screen Detected"),fill=c("black","blue"))
 
 
 #Calculate calculate age band incidence rates
@@ -88,13 +86,20 @@ incidence_long <- pivot_longer(
   values_to = "Rate"
 )
 
-ggplot(incidence_long, aes(x = `Age Range`, y = Rate, color = Source, group = Source)) +
+incidenceplot<-ggplot(incidence_long, aes(x = `Age Range`, y = Rate, color = Source, group = Source)) +
   geom_line() +
   geom_point() +
   labs(x = "Age Range", y = "Incidence per 100,000 person-years",
        title = "Simulated vs Observed Cancer Incidence by Age Band") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+incidenceplot
+RMSE <- sqrt(mean((incidence$Observed - incidence$Rate_per_100000)^2))
 
+sum(detresults$`screen detected`)/sum(detresults$Screens)
+sum(detresults$`screen detected`)/sum(detresults$Cancer[detresults$`Cancer Diagnosed Age`>0])
 
-print(incidence, row.names = FALSE)
+#print(incidence, row.names = FALSE)
+plot(density(risksample$liferisk))
+plot(density(risksample$VBD))
 
+mean(detresults$Cancer)

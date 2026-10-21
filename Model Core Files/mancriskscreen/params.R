@@ -1,3 +1,7 @@
+#Latent cancer bump up
+lc_bump<-runif(1,7.64,8.15)
+  # WF 4.34
+  
 # Global option for whether to use corrected age-at-detection distribution
 CORRECT_BC_AGE <- TRUE
 
@@ -12,7 +16,7 @@ risk_feedback <- 1 #Uptake for attending risk feedback consultation
 screen_change <- 1 #Uptake for changing screening intervals based on risk
 
 #Age of an individual at start of simulation
-start_age <- 38 #Default is 38 to give time for tumours to develop pre-screening
+start_age <- 18 #Default is 38 to give time for tumours to develop pre-screening
 
 #Set time horizon
 time_horizon <- 100
@@ -24,10 +28,55 @@ discount_cost <- 0.035
 ##############Set clinical parameters for screening########################
 
 #Set parameters of a Weibull survival curve to represent all cause mortality
-acmmortality_wb_a <- 9.38
-#7.937
-acmmortality_wb_b <- 89.35
-#86.788
+acmmortality_wb_a <- 7.937
+  #9.38
+
+acmmortality_wb_b <- 86.788
+  #89.35
+
+#Cancer genesis age
+gamma_mean<- runif(1,76.6,82.2)
+  #WF 85.04
+ 
+  
+gamma_sd<-runif(1,20.14,22.7)
+  #WF 23.07
+  
+gamma_p<- runif(1,4.7,6.4)
+  #5.45
+ 
+rgengamma_custom <- function(n, p, scale, k) {
+  scale * rgamma(n, shape = k, rate = 1)^(1 / p)
+}
+
+# Solve for (k, scale) that hit a target mean/sd for a CHOSEN p
+get_gengamma_params <- function(target_mean, target_sd, p) {
+  target_cv2 <- (target_sd / target_mean)^2
+  
+  cv2_given_k <- function(k) {
+    m1 <- exp(lgamma(k + 1/p) - lgamma(k))
+    m2 <- exp(lgamma(k + 2/p) - lgamma(k))
+    (m2 - m1^2) / m1^2 - target_cv2
+  }
+  
+  k <- uniroot(cv2_given_k, interval = c(1e-4, 1e4))$root
+  m1 <- exp(lgamma(k + 1/p) - lgamma(k))
+  scale <- target_mean / m1
+  
+  list(p = p, scale = scale, k = k)
+}
+
+# CDF: P(X <= x) = P(G <= (x/scale)^p)
+pgengamma_custom <- function(x, p, scale, k, lower.tail = TRUE, log.p = FALSE) {
+  pgamma((x / scale)^p, shape = k, rate = 1, lower.tail = lower.tail, log.p = log.p)
+}
+
+# Quantile function: invert the same transform
+qgengamma_custom <- function(prob, p, scale, k, lower.tail = TRUE, log.p = FALSE) {
+  scale * qgamma(prob, shape = k, rate = 1, lower.tail = lower.tail, log.p = log.p)^(1 / p)
+}
+
+gengammaparams<-get_gengamma_params(gamma_mean-18,gamma_sd,gamma_p)
 
 #Set parameters for all cause mortality following breast cancer
 gamma_survival_1 <- exp(-5.618) #Exponential distribution scale parameter stage 1
@@ -96,8 +145,13 @@ US_cdr <- 3 #CDR for US in Mammogram negative women (incremental)
 density_cutoff <- 3
 
 #Set tumour growth rate parameters
-log_norm_mean <- 1.07
-log_norm_sd <- 1.31
+log_norm_mean <- 0.2
+  #Nanaa 0.2
+  #MacInnes 0.5
+  #WF 1.07
+log_norm_sd <- 0.7
+  #Nanaa 0.7
+  #WF #1.31
 max_size <- 128 #Maximum size of tumours, mm diameter
 start_size <- 0.25 #Starting size of tumours, diameter in mm
 Vc = (4 / 3) * pi * (start_size / 2)^3 #Volume at start
@@ -128,7 +182,7 @@ low_risk_cut <- 1.5 #Cut off in low risk only strategies
 ca_size_cut <- c(0.025, 5, 10, 15, 20, 30, 128) #Size cut-points for deciding stage
 
 ##########False Positive and Overdiagnosis parameters################
-recall_rate <- 0.025 #UK false-positive rate
+fp_rate <- c(0.0239,0.0355,0.0459,0.0439) #UK false-positive rate by breast density grade 1-4
 biopsy_rate <- 0.506 #Proportion of referrals without cancer that have biopsy
 
 #### Drug data ####
