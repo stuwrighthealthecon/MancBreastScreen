@@ -13,8 +13,13 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
   file.remove(old_samples)
 
   #Import synthetic dataset derived from PROCAS2 study
-  risk_mat <- read.csv(here::here("inst", "extdata", "synthetic_risk_data.csv"))[, 2:4]
-  colnames(risk_mat) <- c("VBD", "tenyrrisk", "liferisk")
+  risk_raw <- read.csv(here::here("inst", "extdata", "synthetic_risk_data.csv"))
+  risk_mat <- data.frame(
+    VBD       = risk_raw$syn.VBD.,
+    tenyrrisk = risk_raw$syn.X10yr,
+    liferisk  = risk_raw$syn.life,
+    vbd_age   = risk_raw$syn.Age  #Age at which density and risk were measured
+  )
 
   #Creat column for risk group to be entered
   risk_mat$risk_group <- numeric(length(risk_mat$VBD))
@@ -155,7 +160,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     if (intervals == 0) {
       #########################Add Monte Carlo Draws into Sample##############
 
-      list2env(get_psa_parameters(intervals = FALSE), envir = environment())
+      list2env(get_psa_parameters(intervals = FALSE, growth_model = growth_model), envir = environment())
 
       #Draw stage I to III survival parameters
       PSA_gamma_survival <- mvrnorm(mcruns, survmeans, survcovmat) %>%
@@ -166,16 +171,12 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
         data.frame()
 
       #Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
-      PSA_beta1 <- rnorm(mcruns, PSA_beta1[1], PSA_beta1[2])
-      PSA_beta2 <- rnorm(mcruns, PSA_beta2[1], PSA_beta2[2])
-
-      #Draw Mammography sensitivity by volpara density grade from PREVENTICON
-      PSA_Sen_VDG <- data.frame(
-        rbeta(mcruns, PSA_Sen_VDG1[1], PSA_Sen_VDG1[2]),
-        rbeta(mcruns, PSA_Sen_VDG2[1], PSA_Sen_VDG2[2]),
-        rbeta(mcruns, PSA_Sen_VDG3[1], PSA_Sen_VDG3[2]),
-        rbeta(mcruns, PSA_Sen_VDG4[1], PSA_Sen_VDG4[2])
+      PSA_sens <- data.frame(
+        rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
+        rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
+        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
       )
+
 
       #Draw supplemental Screening CDRs
       PSA_MRI_cdr <- rbeta(mcruns, PSA_MRI_cdr[1], PSA_MRI_cdr[2]) #CDR for MRI in Mammo negative women (incremental)
@@ -187,7 +188,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
         PSA_log_norm_mean[1],
         PSA_log_norm_mean[2]
       )
-      PSA_log_norm_sd <- rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2])
+      PSA_log_norm_sd <- pmax(rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2]), 0.01)
 
       #Chemoprevention drug parameters
 
@@ -219,7 +220,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       PSA_util <- (1 - exp(mvrnorm(mcruns, utilmeans, covutil))) %>%
         data.frame()
     } else {
-      list2env(get_psa_parameters(intervals = TRUE), envir = environment())
+      list2env(get_psa_parameters(intervals = TRUE, growth_model = growth_model), envir = environment())
 
       PSA_gamma_survival <- data.frame(
         runif(mcruns, PSA_gamma_survival1[1], PSA_gamma_survival1[2]),
@@ -233,16 +234,12 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       )
 
       #Mammography with sensitivity conditional on tumour diameter parameters W-F
-      PSA_beta1 <- rnorm(mcruns, PSA_beta1[1], PSA_beta1[2])
-      PSA_beta2 <- rnorm(mcruns, PSA_beta2[1], PSA_beta2[2])
-
-      #Mammography sensitivity by volpara density grade from PREVENTICON
-      PSA_Sen_VDG <- data.frame(
-        rbeta(mcruns, PSA_Sen_VDG1[1], PSA_Sen_VDG1[2]),
-        rbeta(mcruns, PSA_Sen_VDG2[1], PSA_Sen_VDG2[2]),
-        rbeta(mcruns, PSA_Sen_VDG3[1], PSA_Sen_VDG3[2]),
-        rbeta(mcruns, PSA_Sen_VDG4[1], PSA_Sen_VDG4[2])
+      PSA_sens <- data.frame(
+        rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
+        rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
+        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
       )
+
 
       #Supplemental Screening
       PSA_MRI_cdr <- rbeta(mcruns, PSA_MRI_cdr[1], PSA_MRI_cdr[2]) #CDR for MRI in Mammo negative women (incremental)
@@ -254,7 +251,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
         PSA_log_norm_mean[1],
         PSA_log_norm_mean[2]
       )
-      PSA_log_norm_sd <- rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2])
+      PSA_log_norm_sd <- pmax(rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2]), 0.01)
 
       #Drug parameters
 
@@ -294,9 +291,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     PSA_all_p <- cbind(
       PSA_gamma_survival,
       PSA_meta_survival,
-      PSA_beta1,
-      PSA_beta2,
-      PSA_Sen_VDG,
+      PSA_sens,
       PSA_MRI_cdr,
       PSA_US_cdr,
       PSA_log_norm_mean,
@@ -324,12 +319,9 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       "PSA_meta_survival_54",
       "PSA_meta_survival_74",
       "PSA_meta_survival_99",
-      "PSA_beta_1",
-      "PSA_beta_2",
-      'PSA_VDG1_sen',
-      'PSA_VDG2_sen',
-      'PSA_VDG3_sen',
-      'PSA_VDG4_sen',
+      "PSA_sens_b0",
+      "PSA_sens_bsize",
+      "PSA_sens_bdens",
       "PSA_MRI_cdr",
       "PSA_US_cdr",
       "PSA_log_norm_mean",
@@ -366,6 +358,19 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     colnames(masterframe)[1:n_risk_cols] <- colnames(risksample)
     colnames(masterframe)[(n_risk_cols + 1):(n_risk_cols + n_psa_cols)] <- colnames(PSA_all_p)
 
+    #Apply each Monte Carlo set's growth-rate parameters to the women in it:
+    #redraw growth rates and the resulting clinical detection ages
+    ca <- masterframe$cancer == 1
+    masterframe$growth_rate[ca] <- qlnorm(
+      dqrunif(sum(ca), 0, 1),
+      meanlog = masterframe$PSA_log_norm_mean[ca],
+      sdlog = sqrt(masterframe$PSA_log_norm_sd[ca])
+    )
+    masterframe$ca_incidence[ca] <- masterframe$genage[ca] + (
+      log((Vm / Vc)^0.25 - 1) -
+        log((Vm / ((4/3) * pi * (masterframe$clin_detect_size_g[ca] / 2)^3))^0.25 - 1)
+    ) / (0.25 * masterframe$growth_rate[ca])
+
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES
     risksample <- masterframe %>% filter(masterframe$life_expectancy >= screen_startage)
@@ -392,16 +397,16 @@ create_sample_with_misclass <- function(
   screen_strategy
 ) {
   #Import synthetic dataset derived from PROCAS2 study
-  risk_mat <- read.csv(here::here("inst", "extdata", "synthetic_risk_data_with_misclassification.csv"))[,
-    2:7
-  ] %>%
-    dplyr::select(!syn.Age)
-  colnames(risk_mat) <- c(
-    "VBD",
-    "tenyrrisk_est",
-    "liferisk_est",
-    "tenyrrisk_true",
-    "liferisk_true"
+  #Columns selected by name (selecting by position mislabelled them once the
+  #syn.life50 column was added to the file)
+  risk_raw <- read.csv(here::here("inst", "extdata", "synthetic_risk_data_with_misclassification.csv"))
+  risk_mat <- data.frame(
+    VBD            = risk_raw$syn.VBD.,
+    tenyrrisk_est  = risk_raw$syn.X10yr,
+    liferisk_est   = risk_raw$syn.life,
+    tenyrrisk_true = risk_raw$syn.X10yr.true,
+    liferisk_true  = risk_raw$syn.life.true,
+    vbd_age        = risk_raw$syn.Age  #Age at which density and risk were measured
   )
 
   #Creat column for risk group to be entered
@@ -556,7 +561,7 @@ create_sample_with_misclass <- function(
     if (intervals == 0) {
       #########################Add Monte Carlo Draws into Sample##############
 
-      list2env(get_psa_parameters(intervals = FALSE), envir = environment())
+      list2env(get_psa_parameters(intervals = FALSE, growth_model = growth_model), envir = environment())
 
       #Draw stage I to III survival parameters
       PSA_gamma_survival <- mvrnorm(mcruns, survmeans, survcovmat) %>%
@@ -567,16 +572,12 @@ create_sample_with_misclass <- function(
         data.frame()
 
       #Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
-      PSA_beta1 <- rnorm(mcruns, PSA_beta1[1], PSA_beta1[2])
-      PSA_beta2 <- rnorm(mcruns, PSA_beta2[1], PSA_beta2[2])
-
-      #Draw Mammography sensitivity by volpara density grade from PREVENTICON
-      PSA_Sen_VDG <- data.frame(
-        rbeta(mcruns, PSA_Sen_VDG1[1], PSA_Sen_VDG1[2]),
-        rbeta(mcruns, PSA_Sen_VDG2[1], PSA_Sen_VDG2[2]),
-        rbeta(mcruns, PSA_Sen_VDG3[1], PSA_Sen_VDG3[2]),
-        rbeta(mcruns, PSA_Sen_VDG4[1], PSA_Sen_VDG4[2])
+      PSA_sens <- data.frame(
+        rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
+        rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
+        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
       )
+
 
       #Draw supplemental Screening CDRs
       PSA_MRI_cdr <- rbeta(mcruns, PSA_MRI_cdr[1], PSA_MRI_cdr[2]) #CDR for MRI in Mammo negative women (incremental)
@@ -588,7 +589,7 @@ create_sample_with_misclass <- function(
         PSA_log_norm_mean[1],
         PSA_log_norm_mean[2]
       )
-      PSA_log_norm_sd <- rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2])
+      PSA_log_norm_sd <- pmax(rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2]), 0.01)
 
       #Chemoprevention drug parameters
 
@@ -620,7 +621,7 @@ create_sample_with_misclass <- function(
       PSA_util <- (1 - exp(mvrnorm(mcruns, utilmeans, covutil))) %>%
         data.frame()
     } else {
-      list2env(get_psa_parameters(intervals = TRUE), envir = environment())
+      list2env(get_psa_parameters(intervals = TRUE, growth_model = growth_model), envir = environment())
 
       PSA_gamma_survival <- data.frame(
         runif(mcruns, PSA_gamma_survival1[1], PSA_gamma_survival1[2]),
@@ -634,16 +635,12 @@ create_sample_with_misclass <- function(
       )
 
       #Mammography with sensitivity conditional on tumour diameter parameters W-F
-      PSA_beta1 <- rnorm(mcruns, PSA_beta1[1], PSA_beta1[2])
-      PSA_beta2 <- rnorm(mcruns, PSA_beta2[1], PSA_beta2[2])
-
-      #Mammography sensitivity by volpara density grade from PREVENTICON
-      PSA_Sen_VDG <- data.frame(
-        rbeta(mcruns, PSA_Sen_VDG1[1], PSA_Sen_VDG1[2]),
-        rbeta(mcruns, PSA_Sen_VDG2[1], PSA_Sen_VDG2[2]),
-        rbeta(mcruns, PSA_Sen_VDG3[1], PSA_Sen_VDG3[2]),
-        rbeta(mcruns, PSA_Sen_VDG4[1], PSA_Sen_VDG4[2])
+      PSA_sens <- data.frame(
+        rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
+        rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
+        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
       )
+
 
       #Supplemental Screening
       PSA_MRI_cdr <- rbeta(mcruns, PSA_MRI_cdr[1], PSA_MRI_cdr[2]) #CDR for MRI in Mammo negative women (incremental)
@@ -655,7 +652,7 @@ create_sample_with_misclass <- function(
         PSA_log_norm_mean[1],
         PSA_log_norm_mean[2]
       )
-      PSA_log_norm_sd <- rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2])
+      PSA_log_norm_sd <- pmax(rnorm(mcruns, PSA_log_norm_sd[1], PSA_log_norm_sd[2]), 0.01)
 
       #Drug parameters
 
@@ -695,9 +692,7 @@ create_sample_with_misclass <- function(
     PSA_all_p <- cbind(
       PSA_gamma_survival,
       PSA_meta_survival,
-      PSA_beta1,
-      PSA_beta2,
-      PSA_Sen_VDG,
+      PSA_sens,
       PSA_MRI_cdr,
       PSA_US_cdr,
       PSA_log_norm_mean,
@@ -725,12 +720,9 @@ create_sample_with_misclass <- function(
       "PSA_meta_survival_54",
       "PSA_meta_survival_74",
       "PSA_meta_survival_99",
-      "PSA_beta_1",
-      "PSA_beta_2",
-      'PSA_VDG1_sen',
-      'PSA_VDG2_sen',
-      'PSA_VDG3_sen',
-      'PSA_VDG4_sen',
+      "PSA_sens_b0",
+      "PSA_sens_bsize",
+      "PSA_sens_bdens",
       "PSA_MRI_cdr",
       "PSA_US_cdr",
       "PSA_log_norm_mean",
@@ -766,6 +758,19 @@ create_sample_with_misclass <- function(
     masterframe[, (n_risk_cols + 1):(n_risk_cols + n_psa_cols)] <- PSA_all_p
     colnames(masterframe)[1:n_risk_cols] <- colnames(risksample)
     colnames(masterframe)[(n_risk_cols + 1):(n_risk_cols + n_psa_cols)] <- colnames(PSA_all_p)
+
+    #Apply each Monte Carlo set's growth-rate parameters to the women in it:
+    #redraw growth rates and the resulting clinical detection ages
+    ca <- masterframe$cancer == 1
+    masterframe$growth_rate[ca] <- qlnorm(
+      dqrunif(sum(ca), 0, 1),
+      meanlog = masterframe$PSA_log_norm_mean[ca],
+      sdlog = sqrt(masterframe$PSA_log_norm_sd[ca])
+    )
+    masterframe$ca_incidence[ca] <- masterframe$genage[ca] + (
+      log((Vm / Vc)^0.25 - 1) -
+        log((Vm / ((4/3) * pi * (masterframe$clin_detect_size_g[ca] / 2)^3))^0.25 - 1)
+    ) / (0.25 * masterframe$growth_rate[ca])
 
     #Keep women alive at screening start; everyone (with and without cancer)
     #is saved in one sample and run through the DES

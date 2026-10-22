@@ -20,7 +20,7 @@
   "vec_ca_survival_time", "vec_QALY_counter_core", "vec_QALY_counter",
   "vec_QALY_counter_fast", "run_des_vectorised",
   "create_sample", "create_sample_with_misclass", "get_drug_adj_IM",
-  "redraw_drug_pars", "get_psa_parameters",
+  "redraw_drug_pars", "get_psa_parameters", "vbd_at_age",
   "rgengamma_custom", "get_gengamma_params", "pgengamma_custom",
   "qgengamma_custom"
 )
@@ -30,8 +30,9 @@
 #' @param controls A list of run settings; see default_controls(). Settings not
 #'   supplied take their default values.
 #' @param params A list of model parameters; see get_parameters(). If NULL,
-#'   get_parameters() is called after the random seed is set, so the calibrated
-#'   parameters are reproducible.
+#'   get_parameters(growth_model = controls$growth_model) is called after the
+#'   random seed is set. If supplied, it must have been created with the same
+#'   growth model as controls$growth_model.
 #' @return Invisibly, a list with the controls and parameters used, the output
 #'   folders and the result files written. Results are saved as .rds files,
 #'   one per strategy and risk group.
@@ -45,7 +46,12 @@ run_model <- function(controls = default_controls(), params = NULL) {
     set.seed(controls$seed)
     dqrng::dqset.seed(controls$seed)
   }
-  if (is.null(params)) params <- get_parameters()
+  if (is.null(params)) params <- get_parameters(growth_model = controls$growth_model)
+  if (!identical(params$growth_model, controls$growth_model)) {
+    stop("params were created for growth model '", params$growth_model,
+         "' but controls$growth_model is '", controls$growth_model,
+         "'. Use get_parameters(growth_model = \"", controls$growth_model, "\").")
+  }
 
   env <- .new_model_env(params)
 
@@ -80,9 +86,15 @@ run_model <- function(controls = default_controls(), params = NULL) {
   }
   n_cores <- max(1L, min(n_strat, n_cores)) #Limit cores for memory management
 
-  cl <- parallel::makeCluster(n_cores, outfile = "")
-  on.exit(parallel::stopCluster(cl), add = TRUE)
-  doParallel::registerDoParallel(cl)
+  if (n_cores > 1) {
+    cl <- parallel::makeCluster(n_cores, outfile = "")
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    doParallel::registerDoParallel(cl)
+  } else {
+    # One core: run in this R session, avoiding the time and memory cost of
+    # starting a separate R process (results are identical)
+    foreach::registerDoSEQ()
+  }
 
   `%dopar%` <- foreach::`%dopar%`
   foreach::foreach(
@@ -228,15 +240,15 @@ run_model <- function(controls = default_controls(), params = NULL) {
 
   #Drop un-needed columns for memory management, some now some later
   if (MISCLASS) {
-    drop_cols_now  <- c("VBD", "cancer", "feedback", "liferisk_est", "liferisk_true")
+    drop_cols_now  <- c("cancer", "feedback", "liferisk_est", "liferisk_true")
     drop_cols_late <- c("tenyrrisk_est", "tenyrrisk_true")
   } else {
-    drop_cols_now  <- c("VBD", "cancer", "feedback", "liferisk")
+    drop_cols_now  <- c("cancer", "feedback", "liferisk")
     drop_cols_late <- c("tenyrrisk")
   }
   splitmaster_base <- risksample_master[, !names(risksample_master) %in% drop_cols_now]
 
-  keep <- c("risk_group", "VDG", "MRI_screen", "US_screen", "risk_predicted", "interval_change",
+  keep <- c("risk_group", "VDG", "VBD", "vbd_age", "MRI_screen", "US_screen", "risk_predicted", "interval_change",
             "life_expectancy", "ca_incidence", "clin_detect_size_g", "genage", "growth_rate",
             "invite_jitter_years", "tenyrrisk", "tenyrrisk_est", "tenyrrisk_true",
             "starting_menses_status", "time_taking_drug", grep("^PSA_|^mcid$", names(splitmaster_base), value = TRUE))
@@ -386,11 +398,12 @@ run_model <- function(controls = default_controls(), params = NULL) {
     if (PSA == 1L) {
       risk_data <- risksample[1, ]
 
-      beta1 <- risk_data$PSA_beta_1
-      beta2 <- risk_data$PSA_beta_2
+      sens_b0    <- risk_data$PSA_sens_b0
+      sens_bsize <- risk_data$PSA_sens_bsize
+      sens_bdens <- risk_data$PSA_sens_bdens
 
-      log_norm_mean <- risk_data$PSA_log_norm_mean
-      log_norm_sd   <- risk_data$PSA_log_norm_sd
+      # Growth-rate PSA draws are applied to each woman when the cohort is
+      # created (create_sample), so they are not overridden here
 
       gamma_stage <- c(
         exp(risk_data$PSA_gamma_survival_1),
@@ -402,10 +415,6 @@ run_model <- function(controls = default_controls(), params = NULL) {
         exp(risk_data$PSA_meta_survival_74),
         exp(risk_data$PSA_meta_survival_99)
       )
-
-      Sen_VDG <- c(risk_data$PSA_VDG1_sen, risk_data$PSA_VDG2_sen,
-                   risk_data$PSA_VDG3_sen, risk_data$PSA_VDG4_sen)
-      Sen_VDG_av <- mean(Sen_VDG)
 
       MRI_cdr <- risk_data$PSA_MRI_cdr
       US_cdr  <- risk_data$PSA_US_cdr

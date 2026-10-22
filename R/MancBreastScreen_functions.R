@@ -72,6 +72,14 @@ get_drug_matrices <- function(screen_strategy) {
        persistence = persistence, course_length = course_length)
 }
 
+##########Volpara density at a given age (age-related decline)#################
+# Scales density measured at age0 to age, using the mean density-by-age ratios
+# in density_age / density_rel (held flat outside the table's range)
+vbd_at_age <- function(vbd0, age, age0) {
+  f <- function(a) stats::approx(density_age, density_rel, xout = a, rule = 2)$y
+  vbd0 * f(age) / f(age0)
+}
+
 ###############Derive screen_times for a given strategy + risk group#############
 get_screen_times <- function(screen_strategy, risk_group) {
   
@@ -188,19 +196,13 @@ vec_stage_by_size <- function(Ca_size_vec) {
 
 #######################Screening test results simulation##########################
 
-vec_screening_result <- function(Ca_size_vec, VDG_vec, MRI_vec, US_vec) {
+vec_screening_result <- function(Ca_size_vec, VBD_vec, MRI_vec, US_vec) {
   n <- length(Ca_size_vec)
   
-  # Base mammographic sensitivity based on sizes of cancers
-  logit_val   <- exp((Ca_size_vec - beta2) / beta1)
-  base_sens   <- logit_val / (1 + logit_val)
-  base_sens   <- pmin(base_sens, sensitivity_max)
-  
-  # Density adjustment via odds ratio
-  dense_OR  <- (Sen_VDG[VDG_vec] / (1 - Sen_VDG[VDG_vec])) /
-    (Sen_VDG_av      / (1 - Sen_VDG_av))
-  sens_odds <- (base_sens / (1 - base_sens)) * dense_OR
-  Sensitivity <- sens_odds / (1 + sens_odds)
+  # Mammographic sensitivity by tumour diameter (mm) and current Volpara
+  # percent density (VBD_vec, in %), Strandberg & Humphreys 2022
+  eta         <- sens_b0 + sens_bsize * Ca_size_vec + sens_bdens * (VBD_vec / 100)
+  Sensitivity <- 1 / (1 + exp(-eta))
   
   # Single bulk random draw (one per woman)
   rnd_1 <- dqrunif(n, 0, 1)

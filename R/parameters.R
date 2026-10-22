@@ -28,7 +28,8 @@ default_controls <- function(...) {
     mcruns                 = 1,      #Number of Monte Carlo runs (PSA only)
     seed                   = 42,     #Random seed; NULL for an unseeded run
     n_cores                = NULL,   #Cores to use; NULL = one per strategy, up to cores - 1
-    output_dir             = here::here("output") #Folder for samples and results
+    output_dir             = here::here("output"), #Folder for samples and results
+    growth_model           = "Nanaa" #Tumour growth model: "Nanaa" or "MacInnes" (see get_parameters())
   )
   overrides <- list(...)
   unknown <- setdiff(names(overrides), names(controls))
@@ -44,10 +45,29 @@ default_controls <- function(...) {
 #' first (or let run_model() call it after seeding) for reproducible values.
 #'
 #' @param screen_strategy Strategy used to initialise the drug matrices.
+#' @param growth_model Tumour growth model, "Nanaa" (default) or "MacInnes". Sets the
+#'   growth-rate parameters and the natural history parameters calibrated with
+#'   them (lc_bump and the tumour genesis age distribution).
 #' @return A named list of model parameters.
-get_parameters <- function(screen_strategy = 0L) {
-  #Latent cancer bump up
-  lc_bump<-0.67 #Cambridge
+get_parameters <- function(screen_strategy = 0L, growth_model = "Nanaa") {
+  #Tumour growth model and the parameters calibrated with it (22/10/2026:
+  #cumulative hazard scaling of lifetime risk, Strandberg sensitivity with
+  #age-related density decline; calibrated to incidence by age, 3-yearly screening)
+  #  MacInnes et al. 2020: incidence RMSE 18.5, 7.3% undiagnosed at death,
+  #    CDR 7.0 per 1,000 screens, 49% of cancers aged 50-70 screen-detected
+  #  Nanaa et al. 2025: incidence RMSE 22.4, 10.0% undiagnosed at death,
+  #    CDR 8.4 per 1,000 screens, 54% of cancers aged 50-70 screen-detected
+  growth_model <- match.arg(growth_model, c("MacInnes", "Nanaa"))
+  calibrated <- list(
+    MacInnes = list(log_norm_mean = 0.26, log_norm_sd = 0.32, lc_bump = 0.52,
+                    gamma_mean = 82.25, gamma_sd = 24.38, gamma_p = 5.53),
+    Nanaa    = list(log_norm_mean = -0.04, log_norm_sd = 0.48, lc_bump = 0.81,
+                    gamma_mean = 69.67, gamma_sd = 20.19, gamma_p = 6.06)
+  )[[growth_model]]
+
+  #Latent cancer bump up (cumulative hazard scaling of lifetime risk)
+  lc_bump <- calibrated$lc_bump
+  # Previous (Cambridge) 0.67
   # Leeds 6.00
   # WF 4.34
 
@@ -82,16 +102,19 @@ get_parameters <- function(screen_strategy = 0L) {
   acmmortality_wb_b <- 86.788
 
   #Cancer genesis age
-  gamma_mean<- 77.18 #Cambridge
+  gamma_mean <- calibrated$gamma_mean #MacInnes 82.25, Nanaa 69.67
+  #Cambridge 77.18
   #Leeds 81
   #WF 85.04
 
 
-  gamma_sd<-20.73 #Cambridge
+  gamma_sd <- calibrated$gamma_sd #MacInnes 24.38, Nanaa 20.19
+  #Cambridge 20.73
   #Leeds 21
   #WF 23.07
 
-  gamma_p<- 6.03 #Cambridge
+  gamma_p <- calibrated$gamma_p #MacInnes 5.53, Nanaa 6.06
+  #Cambridge 6.03
   #Leeds 6
   #WF 5.45
 
@@ -148,14 +171,29 @@ get_parameters <- function(screen_strategy = 0L) {
   clin_detection_m <- 6.5
   clin_detection_sd <- 0.535
 
-  #Mammography with sensitivity conditional on tumour diameter parameters
-  beta1 <- 1.47
-  beta2 <- 6.51
+  #Mammography sensitivity by tumour diameter and breast density (Strandberg &
+  #Humphreys 2022): sensitivity = logistic(sens_b0 + sens_bsize * diameter (mm)
+  #+ sens_bdens * percent density (as a proportion, 0-1))
+  sens_b0    <- -4.99 #Intercept
+  sens_bsize <-  0.49 #Per mm of tumour diameter
+  sens_bdens <- -2.09 #Per unit percent density (proportion)
+    #Previously Weedon-Fekjaer size-only curve: beta1 1.47, beta2 6.51
 
-  #Mammography sensitivity by volpara density grade
+  #Volpara density grade cut-points (density grades are used for false-positive
+  #rates and supplemental screening eligibility)
   VDG_interval <- c(4.5, 7.5, 15.5)
+  #Mammography sensitivity by volpara density grade (no longer used for
+  #mammography sensitivity, which now uses sens_bdens; kept for reference)
   Sen_VDG <- c(0.75, 0.735, 0.598, 0.513)
   Sen_VDG_av <- 0.666
+
+  #Age-related decline in Volpara volumetric percent density. Each woman's
+  #density is scaled from the age it was measured by the ratio of mean density
+  #at the two ages (BreastScreen Norway, CEBP 2018; cross-sectional,
+  #interpolated; held flat outside 49-69)
+  density_age     <- c(49,   50,   55,   60,   62.5, 65,   69)
+  density_rel     <- c(1.04, 1.00, 0.93, 0.86, 0.82, 0.80, 0.77)
+  density_ref_age <- 50 #Measurement age assumed if a woman's age is missing
 
   #Supplemental screening sensitivity parameters
   Mammo_cdr <- 4.2 #Cancer detection rate per 1000 high dense screens
@@ -165,13 +203,11 @@ get_parameters <- function(screen_strategy = 0L) {
   density_cutoff <- 3
 
   #Set tumour growth rate parameters
-  log_norm_mean <- 0.2
-    #Nanaa 0.2
-    #MacInnes 0.5
-    #WF 1.07
-  log_norm_sd <- 0.7
-    #Nanaa 0.7
-    #WF #1.31
+  #Mean of log growth rate: MacInnes et al. 2020 0.26 (median doubling time
+  #196 days); Nanaa et al. 2025 -0.04 (264 days); WF 1.07
+  log_norm_mean <- calibrated$log_norm_mean
+  #Variance of log growth rate: MacInnes 0.32 (approx.); Nanaa 0.48; WF 1.31
+  log_norm_sd <- calibrated$log_norm_sd
   max_size <- 128 #Maximum size of tumours, mm diameter
   start_size <- 0.25 #Starting size of tumours, diameter in mm
   Vc = (4 / 3) * pi * (start_size / 2)^3 #Volume at start
@@ -497,6 +533,7 @@ get_parameters <- function(screen_strategy = 0L) {
 
   params <- as.list(environment())
   params$screen_strategy <- NULL
+  params$calibrated <- NULL
   params
 }
 
@@ -505,7 +542,8 @@ get_parameters <- function(screen_strategy = 0L) {
 #' @param intervals If TRUE, return the wide distributions used to generate
 #'   data for the GAM metamodels.
 #' @return A named list of PSA distribution parameters.
-get_psa_parameters <- function(intervals = FALSE) {
+get_psa_parameters <- function(intervals = FALSE, growth_model = "Nanaa") {
+  growth_model <- match.arg(growth_model, c("MacInnes", "Nanaa"))
   if (!intervals) {
     #Stage I to III survival parameters
     survmvn <- data.frame(
@@ -525,24 +563,30 @@ get_psa_parameters <- function(intervals = FALSE) {
     metmat <- cov(metmvn)
     metmeans <- c(metmvn[1, 1], metmvn[1, 2], metmvn[1, 3])
 
-    #Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
-    PSA_beta1 <- c(1.47, 0.1)
-    PSA_beta2 <- c(6.51, 0.5)
-
-    #Sensitivity by VDG group
-    PSA_Sen_VDG1 <- c(48, 16)
-    PSA_Sen_VDG2 <- c(208, 75)
-    PSA_Sen_VDG3 <- c(113, 76)
-    PSA_Sen_VDG4 <- c(40, 38)
-    Sen_VDG_av <- 0.757
+    #Mammography sensitivity coefficients (normal: mean, SE). Means from
+    #Strandberg & Humphreys 2022; SEs approximate, from the 95% CIs reported for
+    #the KARMA cohort model (Sci Rep 2023). Coefficients are drawn independently
+    #(their correlation is not available), which overstates uncertainty
+    PSA_sens_b0    <- c(-4.99, 0.20)
+    PSA_sens_bsize <- c(0.49, 0.028)
+    PSA_sens_bdens <- c(-2.09, 0.46)
 
     #Draw supplemental Screening CDRs
     PSA_MRI_cdr <- c(99.495, 19799.5)
     PSA_US_cdr <- c(35.89, 11927)
 
-    #Draw tumour growth rate parameters
-    PSA_log_norm_mean <- c(1.07, 0.09)
-    PSA_log_norm_sd <- c(1.31, 0.11)
+    #Tumour growth rate parameters (normal: mean, SE); log_norm_sd is a variance
+    if (growth_model == "MacInnes") {
+      #MacInnes et al. 2020: SE from the 95% CI of the mean doubling time;
+      #variance approximate, SE assumed
+      PSA_log_norm_mean <- c(0.26, 0.053)
+      PSA_log_norm_sd <- c(0.32, 0.05)
+    } else {
+      #Nanaa et al. 2025: SE of the log median approximated from the IQR
+      #(n = 281); SE of the variance assumed
+      PSA_log_norm_mean <- c(-0.04, 0.052)
+      PSA_log_norm_sd <- c(0.48, 0.07)
+    }
 
     # Chemoprevention Drug parameters
 
@@ -593,24 +637,23 @@ get_psa_parameters <- function(intervals = FALSE) {
     PSA_meta_survival2 <- c(-2, -0.3)
     PSA_meta_survival3 <- c(-1.5, -0.1)
 
-    #Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
-    PSA_beta1 <- c(1.47, 0.1)
-    PSA_beta2 <- c(6.51, 0.5)
-
-    #Sensitivity by VDG group
-    PSA_Sen_VDG1 <- c(48, 16)
-    PSA_Sen_VDG2 <- c(208, 75)
-    PSA_Sen_VDG3 <- c(113, 76)
-    PSA_Sen_VDG4 <- c(40, 38)
-    Sen_VDG_av <- 0.757
+    #Mammography sensitivity coefficients: twice the standard PSA SEs
+    PSA_sens_b0    <- c(-4.99, 0.40)
+    PSA_sens_bsize <- c(0.49, 0.056)
+    PSA_sens_bdens <- c(-2.09, 0.92)
 
     #Draw supplemental Screening CDRs
     PSA_MRI_cdr <- c(99.495, 19799.5)
     PSA_US_cdr <- c(35.89, 11927)
 
-    #Draw tumour growth rate parameters
-    PSA_log_norm_mean <- c(0.8, 1.2)
-    PSA_log_norm_sd <- c(1.31, 0.11)
+    #Tumour growth rate parameters: wide distributions centred on the chosen model
+    if (growth_model == "MacInnes") {
+      PSA_log_norm_mean <- c(0.26, 0.15)
+      PSA_log_norm_sd <- c(0.32, 0.1)
+    } else {
+      PSA_log_norm_mean <- c(-0.04, 0.15)
+      PSA_log_norm_sd <- c(0.48, 0.1)
+    }
 
     # Chemoprevention Drug parameters
 
@@ -648,5 +691,6 @@ get_psa_parameters <- function(intervals = FALSE) {
   }
   params <- as.list(environment())
   params$intervals <- NULL
+  params$growth_model <- NULL
   params
 }

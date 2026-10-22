@@ -197,6 +197,16 @@ run_des_vectorised <- function(risk_df,
     
     if (!any(act_idx)) next
     
+    # Current breast density at this screen: baseline VBD scaled to current age,
+    # and the corresponding density grade (for false-positive rates)
+    vbd_age0 <- if (!is.null(df$vbd_age)) df$vbd_age else rep(density_ref_age, n)
+    vbd_age0[is.na(vbd_age0)] <- density_ref_age
+    vbd_now  <- df$VBD
+    vbd_now[act_idx] <- vbd_at_age(df$VBD[act_idx], screen_age_vec[act_idx],
+                                   vbd_age0[act_idx])
+    vdg_now  <- df$VDG
+    vdg_now[act_idx] <- 1L + findInterval(vbd_now[act_idx], VDG_interval)
+    
     # Lookup discount rates
     disc_screen          <- rep(NA_real_, n)
     disc_screen[act_idx] <- get_disc(screen_age_vec[act_idx])
@@ -243,7 +253,7 @@ run_des_vectorised <- function(risk_df,
       #Determine if cancer is detected by screen
       screen_results <- vec_screening_result(
         df$Ca_size_screen[tumour_idx],
-        df$VDG[tumour_idx],
+        vbd_now[tumour_idx],
         df$MRI_screen[tumour_idx],
         df$US_screen[tumour_idx]
       )
@@ -329,7 +339,7 @@ run_des_vectorised <- function(risk_df,
     #False-positive recalls
     fp_idx     <- act_idx & df$screen_detected_ca == 0L
     fp_draw    <- dqrunif(n, 0, 1)
-    fp_idx <- fp_idx & fp_draw < fp_rate[df$VDG]
+    fp_idx <- fp_idx & fp_draw < fp_rate[vdg_now]
 
     #Individual random draw for biopsy among women recalled
     biopsy_draw <- dqrunif(n, 0, 1)
@@ -484,8 +494,7 @@ run_des_vectorised <- function(risk_df,
     psa_col_names <- c(
       "PSA_gamma_survival_1", "PSA_gamma_survival_2", "PSA_gamma_survival_3",
       "PSA_meta_survival_54", "PSA_meta_survival_74", "PSA_meta_survival_99",
-      "PSA_beta_1", "PSA_beta_2",
-      "PSA_VDG1_sen", "PSA_VDG2_sen", "PSA_VDG3_sen", "PSA_VDG4_sen",
+      "PSA_sens_b0", "PSA_sens_bsize", "PSA_sens_bdens",
       "PSA_MRI_cdr", "PSA_US_cdr",
       "PSA_log_norm_mean", "PSA_log_norm_sd",
       "PSA_eff_ana", "PSA_eff_tam", "PSA_dropout_ana", "PSA_dropout_tam",

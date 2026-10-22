@@ -41,26 +41,28 @@ metmat <- cov(metmvn)
 metmeans <- c(metmvn[1, 1], metmvn[1, 2], metmvn[1, 3])
 PSA_meta_survival <- mvrnorm(mcruns, metmeans, metmat)
 
-#Draw Mammography with sensitivity conditional on tumour diameter parameters W-F
-PSA_beta1 <- rnorm(mcruns, 1.47, 0.1)
-PSA_beta2 <- rnorm(mcruns, 6.51, 0.5)
-
-#Draw Mammography sensitivity by volpara density grade from PREVENTICON
-PSA_Sen_VDG <- data.frame(
-  rbeta(mcruns, 48, 16),
-  rbeta(mcruns, 208, 75),
-  rbeta(mcruns, 113, 76),
-  rbeta(mcruns, 40, 38)
+#Draw mammography sensitivity coefficients (Strandberg & Humphreys 2022;
+#must match get_psa_parameters())
+PSA_sens <- data.frame(
+  rnorm(mcruns, -4.99, 0.20),
+  rnorm(mcruns, 0.49, 0.028),
+  rnorm(mcruns, -2.09, 0.46)
 )
-Sen_VDG_av <- 0.757
 
 #Draw supplemental Screening CDRs
 PSA_MRI_cdr <- rbeta(mcruns, 99.495, 19799.5) #CDR for MRI in Mammo negative women (incremental)
 PSA_US_cdr <- rbeta(mcruns, 35.89, 11927) #CDR for US in Mammo negative women (incremental)
 
 #Draw tumour growth rate parameters
-PSA_log_norm_mean <- rnorm(mcruns, 1.07, 0.09)
-PSA_log_norm_sd <- rnorm(mcruns, 1.31, 0.11)
+#Must match the growth model used to generate the PSA data
+growth_model <- "Nanaa" # or "MacInnes"
+if (growth_model == "MacInnes") {
+  PSA_log_norm_mean <- rnorm(mcruns, 0.26, 0.053) #MacInnes et al. 2020
+  PSA_log_norm_sd <- pmax(rnorm(mcruns, 0.32, 0.05), 0.01)
+} else {
+  PSA_log_norm_mean <- rnorm(mcruns, -0.04, 0.052) #Nanaa et al. 2025
+  PSA_log_norm_sd <- pmax(rnorm(mcruns, 0.48, 0.07), 0.01)
+}
 
 #Draw costs
 PSA_cost_strat <- (rlnorm(mcruns, 1.8826894, 0.1015175))
@@ -85,9 +87,7 @@ PSA_util <- 1 - exp(mvrnorm(mcruns, utilmeans, covutil))
 PSA_all_p <- cbind(
   PSA_gamma_survival,
   PSA_meta_survival,
-  PSA_beta1,
-  PSA_beta2,
-  PSA_Sen_VDG,
+  PSA_sens,
   PSA_MRI_cdr,
   PSA_US_cdr,
   PSA_log_norm_mean,
@@ -109,12 +109,9 @@ colnames(PSA_all_p) <- c(
   "PSA_meta_survival_54",
   "PSA_meta_survival_74",
   "PSA_meta_survival_99",
-  "PSA_beta_1",
-  "PSA_beta_2",
-  'PSA_VDG1_sen',
-  'PSA_VDG2_sen',
-  'PSA_VDG3_sen',
-  'PSA_VDG4_sen',
+  "PSA_sens_b0",
+  "PSA_sens_bsize",
+  "PSA_sens_bdens",
   "PSA_MRI_cdr",
   "PSA_US_cdr",
   "PSA_log_norm_mean",

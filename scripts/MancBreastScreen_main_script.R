@@ -39,7 +39,8 @@ controls <- default_controls(
   desired_cases          = 300000, #Number of cancer cases required
   mcruns                 = 1,      #Number of Monte Carlo runs
   seed                   = 42,     #Random seed (NULL for an unseeded run)
-  n_cores                = NULL    #Cores to use (NULL = one per strategy, up to cores - 1)
+  n_cores                = NULL,   #Cores to use (NULL = one per strategy, up to cores - 1)
+  growth_model           = "Nanaa" #Tumour growth model: "Nanaa" or "MacInnes"
 )
 
 # ----------------------------------------------------------------------------
@@ -47,7 +48,9 @@ controls <- default_controls(
 # ----------------------------------------------------------------------------
 # Leave as NULL to use the base-case parameters (drawn after the seed is set).
 # To change inputs, e.g.:
-#   set.seed(controls$seed); params <- get_parameters(); params$cost_screen <- 45
+#   set.seed(controls$seed)
+#   params <- get_parameters(growth_model = controls$growth_model)
+#   params$cost_screen <- 45
 params <- NULL
 
 # ----------------------------------------------------------------------------
