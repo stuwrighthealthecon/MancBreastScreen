@@ -47,8 +47,9 @@ default_controls <- function(...) {
 #' @return A named list of model parameters.
 get_parameters <- function(screen_strategy = 0L) {
   #Latent cancer bump up
-  lc_bump<-runif(1,7.64,8.15)
-    # WF 4.34
+  lc_bump<-7.90 #Cambridge
+  # Leeds 6.00
+  # WF 4.34
 
   # Global option for whether to use corrected age-at-detection distribution
   CORRECT_BC_AGE <- TRUE
@@ -77,21 +78,22 @@ get_parameters <- function(screen_strategy = 0L) {
 
   #Set parameters of a Weibull survival curve to represent all cause mortality
   acmmortality_wb_a <- 7.937
-    #9.38
 
   acmmortality_wb_b <- 86.788
-    #89.35
 
   #Cancer genesis age
-  gamma_mean<- runif(1,76.6,82.2)
-    #WF 85.04
+  gamma_mean<- 77.18 #Cambridge
+  #Leeds 81
+  #WF 85.04
 
 
-  gamma_sd<-runif(1,20.14,22.7)
-    #WF 23.07
+  gamma_sd<-20.73 #Cambridge
+  #Leeds 21
+  #WF 23.07
 
-  gamma_p<- runif(1,4.7,6.4)
-    #5.45
+  gamma_p<- 6.03 #Cambridge
+  #Leeds 6
+  #WF 5.45
 
 
   gengammaparams<-get_gengamma_params(gamma_mean-18,gamma_sd,gamma_p)
