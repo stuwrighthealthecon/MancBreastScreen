@@ -47,7 +47,7 @@ default_controls <- function(...) {
 #' @return A named list of model parameters.
 get_parameters <- function(screen_strategy = 0L) {
   #Latent cancer bump up
-  lc_bump<-7.90 #Cambridge
+  lc_bump<-0.67 #Cambridge
   # Leeds 6.00
   # WF 4.34
 
@@ -141,7 +141,7 @@ get_parameters <- function(screen_strategy = 0L) {
     "v1" = c(0.383, 0.567, 0.611, 0.557, 0, 0),
     "v2" = c(0.033, 0.111, 0.180, 0.208, 0.723, 0.563),
     "v3" = c(0.058, 0.057, 0.089, 0.147, 0.206, 0.351),
-    "v5" = c(0.525, 0.265, 0.120, 0.088, 0.071, 0.086)
+    "v5" = c(0.526, 0.265, 0.120, 0.088, 0.071, 0.086)
   )
 
   #Set mean and sd of tumour doublings at clinical detection
