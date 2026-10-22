@@ -3,7 +3,7 @@ library(tidyverse)
 #Load data
 filenames <- list.files(det_output_path, pattern = "\\.rds$", full.names = TRUE)
 alldata   <- do.call(rbind, lapply(filenames, readRDS))
-detresults <- as.data.frame(do.call("rbind", alldata))
+detresults <- alldata
 
 #Create data.frame of screen and clinically detected cancers
 screendet <- detresults %>% filter(detresults$`screen detected` == 1)
@@ -13,7 +13,6 @@ clindet <- detresults %>% filter(detresults$`screen detected` == 0 & detresults$
 screen_stage_props<-data.frame("Names"=c("I","II","III","IV","DCIS"),
                                "Predicted"=c(tabulate(screendet$Stage)/sum(tabulate(screendet$Stage))),
                                "Observed"=c(0.4020,0.2310,0.1310,0.0240,0.2120))
-view(all_stage_props)
 #Caluclate Distribution of Stages of all cancers
 all_stage_props<-data.frame("Names"=c("I","II","III","IV","DCIS"),
                             "Predicted"=c(tabulate(detresults$Stage)/sum(tabulate(detresults$Stage))),
@@ -99,7 +98,5 @@ sum(detresults$`screen detected`)/sum(detresults$Screens)
 sum(detresults$`screen detected`)/sum(detresults$Cancer[detresults$`Cancer Diagnosed Age`>0])
 
 #print(incidence, row.names = FALSE)
-plot(density(risksample$liferisk))
-plot(density(risksample$VBD))
 
 mean(detresults$Cancer)

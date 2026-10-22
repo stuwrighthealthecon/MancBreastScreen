@@ -89,9 +89,11 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
     risksample$life_expectancy
   )
 
-  #Determine if a cancer will develop
+  #Determine if a cancer will develop. Lifetime risk (%) is scaled up on the
+  #cumulative hazard scale, p' = 1 - (1 - p)^(1 + lc_bump), to give the risk of
+  #developing a tumour (diagnosed or not); this keeps risks below 100%
   risksample$cancer <- ifelse(
-    dqrunif(length(risksample$cancer), 0, 1) < ((risksample$liferisk+lc_bump) / 100),
+    dqrunif(length(risksample$cancer), 0, 1) < (1 - (1 - risksample$liferisk / 100)^(1 + lc_bump)),
     1,
     0
   )
@@ -473,9 +475,10 @@ create_sample_with_misclass <- function(
     100,
     risksample$life_expectancy
   )
-  #Determine if a cancer will develop
+  #Determine if a cancer will develop (true lifetime risk, cumulative hazard
+  #scaling as in create_sample())
   risksample$cancer <- ifelse(
-    dqrunif(length(risksample$cancer), 0, 1) < ((risksample$liferisk_true+lc_bump) / 100),
+    dqrunif(length(risksample$cancer), 0, 1) < (1 - (1 - risksample$liferisk_true / 100)^(1 + lc_bump)),
     1,
     0
   )
