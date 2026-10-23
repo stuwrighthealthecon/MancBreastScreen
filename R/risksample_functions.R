@@ -174,7 +174,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       PSA_sens <- data.frame(
         rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
         rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
-        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
+        sapply(1:4, function(g) rnorm(mcruns, dens_logOR[g], PSA_dens_logOR_se[g]))
       )
 
 
@@ -237,7 +237,7 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       PSA_sens <- data.frame(
         rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
         rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
-        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
+        sapply(1:4, function(g) rnorm(mcruns, dens_logOR[g], PSA_dens_logOR_se[g]))
       )
 
 
@@ -321,7 +321,10 @@ create_sample <- function(PSA = 0, intervals = 0, seed = 1, screen_strategy) {
       "PSA_meta_survival_99",
       "PSA_sens_b0",
       "PSA_sens_bsize",
-      "PSA_sens_bdens",
+      "PSA_dens_logOR_1",
+      "PSA_dens_logOR_2",
+      "PSA_dens_logOR_3",
+      "PSA_dens_logOR_4",
       "PSA_MRI_cdr",
       "PSA_US_cdr",
       "PSA_log_norm_mean",
@@ -575,7 +578,7 @@ create_sample_with_misclass <- function(
       PSA_sens <- data.frame(
         rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
         rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
-        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
+        sapply(1:4, function(g) rnorm(mcruns, dens_logOR[g], PSA_dens_logOR_se[g]))
       )
 
 
@@ -638,7 +641,7 @@ create_sample_with_misclass <- function(
       PSA_sens <- data.frame(
         rnorm(mcruns, PSA_sens_b0[1], PSA_sens_b0[2]),
         rnorm(mcruns, PSA_sens_bsize[1], PSA_sens_bsize[2]),
-        rnorm(mcruns, PSA_sens_bdens[1], PSA_sens_bdens[2])
+        sapply(1:4, function(g) rnorm(mcruns, dens_logOR[g], PSA_dens_logOR_se[g]))
       )
 
 
@@ -722,7 +725,10 @@ create_sample_with_misclass <- function(
       "PSA_meta_survival_99",
       "PSA_sens_b0",
       "PSA_sens_bsize",
-      "PSA_sens_bdens",
+      "PSA_dens_logOR_1",
+      "PSA_dens_logOR_2",
+      "PSA_dens_logOR_3",
+      "PSA_dens_logOR_4",
       "PSA_MRI_cdr",
       "PSA_US_cdr",
       "PSA_log_norm_mean",

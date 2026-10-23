@@ -400,7 +400,8 @@ run_model <- function(controls = default_controls(), params = NULL) {
 
       sens_b0    <- risk_data$PSA_sens_b0
       sens_bsize <- risk_data$PSA_sens_bsize
-      sens_bdens <- risk_data$PSA_sens_bdens
+      dens_logOR <- c(risk_data$PSA_dens_logOR_1, risk_data$PSA_dens_logOR_2,
+                      risk_data$PSA_dens_logOR_3, risk_data$PSA_dens_logOR_4)
 
       # Growth-rate PSA draws are applied to each woman when the cohort is
       # created (create_sample), so they are not overridden here

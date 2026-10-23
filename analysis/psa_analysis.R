@@ -41,12 +41,17 @@ metmat <- cov(metmvn)
 metmeans <- c(metmvn[1, 1], metmvn[1, 2], metmvn[1, 3])
 PSA_meta_survival <- mvrnorm(mcruns, metmeans, metmat)
 
-#Draw mammography sensitivity coefficients (Strandberg & Humphreys 2022;
-#must match get_psa_parameters())
+#Growth model used to generate the PSA data ("Nanaa" or "MacInnes")
+growth_model <- "Nanaa"
+
+#Draw mammography sensitivity coefficients (must match get_parameters() and
+#get_psa_parameters() for the growth model used)
+dens_logOR <- if (growth_model == "Nanaa") c(0.127, -0.017, -1.364, -2.167) else
+  c(0.737, 0.502, -0.799, -1.639)
 PSA_sens <- data.frame(
-  rnorm(mcruns, -4.99, 0.20),
-  rnorm(mcruns, 0.49, 0.028),
-  rnorm(mcruns, -2.09, 0.46)
+  rnorm(mcruns, -4.8344, 0.202),
+  rnorm(mcruns, 0.4948, 0.0284),
+  sapply(1:4, function(g) rnorm(mcruns, dens_logOR[g], c(0.289, 0.135, 0.148, 0.226)[g]))
 )
 
 #Draw supplemental Screening CDRs
@@ -54,8 +59,7 @@ PSA_MRI_cdr <- rbeta(mcruns, 99.495, 19799.5) #CDR for MRI in Mammo negative wom
 PSA_US_cdr <- rbeta(mcruns, 35.89, 11927) #CDR for US in Mammo negative women (incremental)
 
 #Draw tumour growth rate parameters
-#Must match the growth model used to generate the PSA data
-growth_model <- "Nanaa" # or "MacInnes"
+#Must match the growth model used to generate the PSA data (set above)
 if (growth_model == "MacInnes") {
   PSA_log_norm_mean <- rnorm(mcruns, 0.26, 0.053) #MacInnes et al. 2020
   PSA_log_norm_sd <- pmax(rnorm(mcruns, 0.32, 0.05), 0.01)
@@ -111,7 +115,10 @@ colnames(PSA_all_p) <- c(
   "PSA_meta_survival_99",
   "PSA_sens_b0",
   "PSA_sens_bsize",
-  "PSA_sens_bdens",
+  "PSA_dens_logOR_1",
+  "PSA_dens_logOR_2",
+  "PSA_dens_logOR_3",
+  "PSA_dens_logOR_4",
   "PSA_MRI_cdr",
   "PSA_US_cdr",
   "PSA_log_norm_mean",

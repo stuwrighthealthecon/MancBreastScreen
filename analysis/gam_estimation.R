@@ -60,7 +60,10 @@ modQ <- bam(
     s(PSA_meta_survival_99, by = alternative, bs = "cr") +
     s(PSA_sens_b0, by = alternative, bs = "cr") +
     s(PSA_sens_bsize, by = alternative, bs = "cr") +
-    s(PSA_sens_bdens, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_1, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_2, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_3, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_4, by = alternative, bs = "cr") +
     s(PSA_log_norm_mean, by = alternative, bs = "cr") +
     s(PSA_log_norm_sd, by = alternative, bs = "cr") +
     alternative
@@ -96,7 +99,10 @@ modC <- bam(
     s(PSA_meta_survival_99, by = alternative, bs = "cr") +
     s(PSA_sens_b0, by = alternative, bs = "cr") +
     s(PSA_sens_bsize, by = alternative, bs = "cr") +
-    s(PSA_sens_bdens, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_1, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_2, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_3, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_4, by = alternative, bs = "cr") +
     s(PSA_log_norm_mean, by = alternative, bs = "cr") +
     s(PSA_log_norm_sd, by = alternative, bs = "cr") +
     s(PSA_cost_follow_up, by = alternative, bs = "cr") +
@@ -136,7 +142,10 @@ modQ <- bam(
     s(PSA_meta_survival_99, by = alternative, bs = "cr") +
     s(PSA_sens_b0, by = alternative, bs = "cr") +
     s(PSA_sens_bsize, by = alternative, bs = "cr") +
-    s(PSA_sens_bdens, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_1, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_2, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_3, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_4, by = alternative, bs = "cr") +
     s(PSA_log_norm_mean, by = alternative, bs = "cr") +
     s(PSA_log_norm_sd, by = alternative, bs = "cr") +
     alternative
@@ -172,7 +181,10 @@ modC <- bam(
     s(PSA_meta_survival_99, by = alternative, bs = "cr") +
     s(PSA_sens_b0, by = alternative, bs = "cr") +
     s(PSA_sens_bsize, by = alternative, bs = "cr") +
-    s(PSA_sens_bdens, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_1, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_2, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_3, by = alternative, bs = "cr") +
+    s(PSA_dens_logOR_4, by = alternative, bs = "cr") +
     s(PSA_log_norm_mean, by = alternative, bs = "cr") +
     s(PSA_log_norm_sd, by = alternative, bs = "cr") +
     s(PSA_cost_follow_up, by = alternative, bs = "cr") +

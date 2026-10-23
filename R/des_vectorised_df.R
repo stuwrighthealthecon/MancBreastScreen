@@ -48,6 +48,8 @@ run_des_vectorised <- function(risk_df,
   
   # 0b. Initialise state and counter columns (full length: df is a list, so scalars don't recycle)
   df$age                  <- rep(start_age, n)
+  df$last_screen_age      <- rep(NA_real_, n)    #Age at last screen attended
+  df$last_screen_vdg      <- rep(NA_integer_, n) #Density grade at last screen attended
   df$active               <- rep(TRUE, n)   #Is person active in simulation (alive and cancer free)
   df$interval_ca          <- integer(n)     #Interval cancer detected
   df$screen_detected_ca   <- integer(n)     #Cancer found by screening
@@ -206,6 +208,8 @@ run_des_vectorised <- function(risk_df,
                                    vbd_age0[act_idx])
     vdg_now  <- df$VDG
     vdg_now[act_idx] <- 1L + findInterval(vbd_now[act_idx], VDG_interval)
+    df$last_screen_age[act_idx] <- screen_age_vec[act_idx]
+    df$last_screen_vdg[act_idx] <- vdg_now[act_idx]
     
     # Lookup discount rates
     disc_screen          <- rep(NA_real_, n)
@@ -253,7 +257,7 @@ run_des_vectorised <- function(risk_df,
       #Determine if cancer is detected by screen
       screen_results <- vec_screening_result(
         df$Ca_size_screen[tumour_idx],
-        vbd_now[tumour_idx],
+        vdg_now[tumour_idx],
         df$MRI_screen[tumour_idx],
         df$US_screen[tumour_idx]
       )
@@ -485,6 +489,8 @@ run_des_vectorised <- function(risk_df,
     `Life Years`           = df$LY_counter,
     Stage                  = df$cd_stage,
     `Cancer Size`          = df$cd_size,
+    `Last Screen Age`      = df$last_screen_age,
+    `Last Screen VDG`      = df$last_screen_vdg,
     `Death Age`            = df$cd_death_age,
     `Cancer Screen Number` = df$cd_screen_number,
     check.names            = FALSE
@@ -494,7 +500,8 @@ run_des_vectorised <- function(risk_df,
     psa_col_names <- c(
       "PSA_gamma_survival_1", "PSA_gamma_survival_2", "PSA_gamma_survival_3",
       "PSA_meta_survival_54", "PSA_meta_survival_74", "PSA_meta_survival_99",
-      "PSA_sens_b0", "PSA_sens_bsize", "PSA_sens_bdens",
+      "PSA_sens_b0", "PSA_sens_bsize",
+      "PSA_dens_logOR_1", "PSA_dens_logOR_2", "PSA_dens_logOR_3", "PSA_dens_logOR_4",
       "PSA_MRI_cdr", "PSA_US_cdr",
       "PSA_log_norm_mean", "PSA_log_norm_sd",
       "PSA_eff_ana", "PSA_eff_tam", "PSA_dropout_ana", "PSA_dropout_tam",

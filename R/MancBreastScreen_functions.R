@@ -196,12 +196,13 @@ vec_stage_by_size <- function(Ca_size_vec) {
 
 #######################Screening test results simulation##########################
 
-vec_screening_result <- function(Ca_size_vec, VBD_vec, MRI_vec, US_vec) {
+vec_screening_result <- function(Ca_size_vec, VDG_vec, MRI_vec, US_vec) {
   n <- length(Ca_size_vec)
   
-  # Mammographic sensitivity by tumour diameter (mm) and current Volpara
-  # percent density (VBD_vec, in %), Strandberg & Humphreys 2022
-  eta         <- sens_b0 + sens_bsize * Ca_size_vec + sens_bdens * (VBD_vec / 100)
+  # Mammographic sensitivity by tumour diameter (mm), Strandberg & Humphreys
+  # 2022 size-only model, adjusted by a log odds ratio for the woman's current
+  # Volpara density grade (VDG_vec)
+  eta         <- sens_b0 + sens_bsize * Ca_size_vec + dens_logOR[VDG_vec]
   Sensitivity <- 1 / (1 + exp(-eta))
   
   # Single bulk random draw (one per woman)

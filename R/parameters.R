@@ -57,12 +57,19 @@ get_parameters <- function(screen_strategy = 0L, growth_model = "Nanaa") {
   #    CDR 7.0 per 1,000 screens, 49% of cancers aged 50-70 screen-detected
   #  Nanaa et al. 2025: incidence RMSE 22.4, 10.0% undiagnosed at death,
   #    CDR 8.4 per 1,000 screens, 54% of cancers aged 50-70 screen-detected
+  #  Density odds ratios (dens_logOR) calibrated 23/10/2026 with the size-only
+  #  Strandberg curve, to Payne et al. 2025 programme sensitivity by grade:
+  #    MacInnes: 75.3/73.0/59.3/49.2% (overall 68.1%), CDR 7.6, interval 3.6 per 1,000
+  #    Nanaa:    75.3/73.8/59.2/51.3% (overall 68.6%), CDR 8.2, interval 3.8 per 1,000
+  #    (Payne: 75.0/73.5/59.8/51.3%, overall 66.6%, CDR 8.2, interval 4.1 per 1,000)
   growth_model <- match.arg(growth_model, c("MacInnes", "Nanaa"))
   calibrated <- list(
     MacInnes = list(log_norm_mean = 0.26, log_norm_sd = 0.32, lc_bump = 0.52,
-                    gamma_mean = 82.25, gamma_sd = 24.38, gamma_p = 5.53),
+                    gamma_mean = 82.25, gamma_sd = 24.38, gamma_p = 5.53,
+                    dens_logOR = c(0.737, 0.502, -0.799, -1.639)),
     Nanaa    = list(log_norm_mean = -0.04, log_norm_sd = 0.48, lc_bump = 0.81,
-                    gamma_mean = 69.67, gamma_sd = 20.19, gamma_p = 6.06)
+                    gamma_mean = 69.67, gamma_sd = 20.19, gamma_p = 6.06,
+                    dens_logOR = c(0.127, -0.017, -1.364, -2.167))
   )[[growth_model]]
 
   #Latent cancer bump up (cumulative hazard scaling of lifetime risk)
@@ -171,19 +178,24 @@ get_parameters <- function(screen_strategy = 0L, growth_model = "Nanaa") {
   clin_detection_m <- 6.5
   clin_detection_sd <- 0.535
 
-  #Mammography sensitivity by tumour diameter and breast density (Strandberg &
-  #Humphreys 2022): sensitivity = logistic(sens_b0 + sens_bsize * diameter (mm)
-  #+ sens_bdens * percent density (as a proportion, 0-1))
-  sens_b0    <- -4.99 #Intercept
-  sens_bsize <-  0.49 #Per mm of tumour diameter
-  sens_bdens <- -2.09 #Per unit percent density (proportion)
+  #Mammography sensitivity at a screen: logistic(sens_b0 + sens_bsize * tumour
+  #diameter (mm) + dens_logOR[density grade at the screen]).
+  #Size: Strandberg & Humphreys 2022 size-only model (invasive cancers, KARMA)
+  sens_b0    <- -4.8344 #Intercept
+  sens_bsize <-  0.4948 #Per mm of tumour diameter
     #Previously Weedon-Fekjaer size-only curve: beta1 1.47, beta2 6.51
+  #Density: log odds ratios by Volpara density grade, calibrated so simulated
+  #programme sensitivity (screen-detected / (screen-detected + interval cancers
+  #within 40 months)) by grade matches Payne et al. 2025 (75.0, 73.5, 59.8, 51.3%)
+  dens_logOR <- calibrated$dens_logOR
+    #Uncalibrated (Payne sensitivities as odds ratios vs 66.6% average):
+    #log(c(1.505, 1.391, 0.746, 0.528))
 
   #Volpara density grade cut-points (density grades are used for false-positive
   #rates and supplemental screening eligibility)
   VDG_interval <- c(4.5, 7.5, 15.5)
-  #Mammography sensitivity by volpara density grade (no longer used for
-  #mammography sensitivity, which now uses sens_bdens; kept for reference)
+  #Programme sensitivity by Volpara density grade, Payne et al. 2025 (calibration
+  #targets for dens_logOR; not used directly in the model)
   Sen_VDG <- c(0.75, 0.735, 0.598, 0.513)
   Sen_VDG_av <- 0.666
 
@@ -563,13 +575,14 @@ get_psa_parameters <- function(intervals = FALSE, growth_model = "Nanaa") {
     metmat <- cov(metmvn)
     metmeans <- c(metmvn[1, 1], metmvn[1, 2], metmvn[1, 3])
 
-    #Mammography sensitivity coefficients (normal: mean, SE). Means from
-    #Strandberg & Humphreys 2022; SEs approximate, from the 95% CIs reported for
-    #the KARMA cohort model (Sci Rep 2023). Coefficients are drawn independently
-    #(their correlation is not available), which overstates uncertainty
-    PSA_sens_b0    <- c(-4.99, 0.20)
-    PSA_sens_bsize <- c(0.49, 0.028)
-    PSA_sens_bdens <- c(-2.09, 0.46)
+    #Mammography sensitivity (normal: mean, SE). Size coefficients: Strandberg &
+    #Humphreys 2022, SEs from their 95% CIs, drawn independently (correlation not
+    #available). Density log odds ratios: calibrated values, SEs approximated from
+    #the Payne et al. counts behind each grade's sensitivity (beta(48,16),
+    #beta(208,75), beta(113,76), beta(40,38))
+    PSA_sens_b0    <- c(-4.8344, 0.202)
+    PSA_sens_bsize <- c(0.4948, 0.0284)
+    PSA_dens_logOR_se <- c(0.289, 0.135, 0.148, 0.226)
 
     #Draw supplemental Screening CDRs
     PSA_MRI_cdr <- c(99.495, 19799.5)
@@ -637,10 +650,10 @@ get_psa_parameters <- function(intervals = FALSE, growth_model = "Nanaa") {
     PSA_meta_survival2 <- c(-2, -0.3)
     PSA_meta_survival3 <- c(-1.5, -0.1)
 
-    #Mammography sensitivity coefficients: twice the standard PSA SEs
-    PSA_sens_b0    <- c(-4.99, 0.40)
-    PSA_sens_bsize <- c(0.49, 0.056)
-    PSA_sens_bdens <- c(-2.09, 0.92)
+    #Mammography sensitivity: twice the standard PSA SEs
+    PSA_sens_b0    <- c(-4.8344, 0.404)
+    PSA_sens_bsize <- c(0.4948, 0.0568)
+    PSA_dens_logOR_se <- 2 * c(0.289, 0.135, 0.148, 0.226)
 
     #Draw supplemental Screening CDRs
     PSA_MRI_cdr <- c(99.495, 19799.5)
