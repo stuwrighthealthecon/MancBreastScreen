@@ -352,7 +352,9 @@ run_des_vectorised <- function(risk_df,
     #False-positive recalls
     fp_idx     <- act_idx & df$screen_detected_ca == 0L
     fp_draw    <- dqrunif(n, 0, 1)
-    fp_idx <- fp_idx & fp_draw < fp_rate[vdg_now]
+    # Rate by current density grade, scaled for first or repeat screens
+    fp_mult <- ifelse(df$screen_count == 1L, fp_mult_first, fp_mult_repeat)
+    fp_idx <- fp_idx & fp_draw < fp_rate[vdg_now] * fp_mult
 
     #Individual random draw for biopsy among women recalled
     biopsy_draw <- dqrunif(n, 0, 1)

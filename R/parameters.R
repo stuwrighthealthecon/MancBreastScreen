@@ -251,9 +251,16 @@ get_parameters <- function(screen_strategy = 0L, growth_model = "Nanaa") {
 
   ##########False Positive and Overdiagnosis parameters################
   #False-positive recall rate per screen by Volpara density grade 1-4, applied
-  #with each woman's grade at the screen. Consistent with Payne et al. 2025:
-  #recall 3.0/4.5/5.5/5.3% minus the implied detection rate by category
+  #with each woman's grade at the screen. Relative rates by grade from Payne et
+  #al. 2025 (recall 3.0/4.5/5.5/5.3% minus the implied detection rate by category)
   fp_rate <- c(0.0239,0.0355,0.0459,0.0439)
+  #Multipliers on fp_rate at a woman's first screen and at repeat screens, set so
+  #recall matches NHS England 2022-23 (referral for assessment 6.2% at first
+  #screens, 2.8% at repeat screens). Model recall for 3-yearly screening with
+  #these values: 6.05% first, 2.83% repeat, 3.45% overall. Set both to 1 to use
+  #the Payne et al. rates unchanged
+  fp_mult_first  <- 1.54
+  fp_mult_repeat <- 0.604
   biopsy_rate <- 0.506 #Proportion of referrals without cancer that have biopsy
 
   #### Drug data ####
