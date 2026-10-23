@@ -101,3 +101,34 @@ propscreen<-sum(detresults$`screen detected`)/sum(detresults$Cancer[detresults$`
 #print(incidence, row.names = FALSE)
 
 #mean(detresults$Cancer)
+
+
+#Recall (referral for assessment) rates ----------------------------------------
+#Recall = false-positive recalls + screen-detected cancers, per screen attended.
+#Observed: NHS England 2022-23 (women 45+) 6.2% first screens, 2.8% repeat
+#screens, 3.3% all; Payne et al. 2025 by density category 3.0/4.5/5.5/5.3%
+n_screens  <- sum(detresults$Screens)
+n_first    <- sum(detresults$Screens >= 1)
+sd_first   <- sum(detresults$`screen detected` == 1 & detresults$`Cancer Screen Number` == 1)
+fp_all     <- sum(detresults$`False Positives`)
+fp_first   <- sum(detresults$`FP First Screen`)
+screens_g  <- c(sum(detresults$`Screens VDG1`), sum(detresults$`Screens VDG2`),
+                sum(detresults$`Screens VDG3`), sum(detresults$`Screens VDG4`))
+fp_g       <- c(sum(detresults$`FP VDG1`), sum(detresults$`FP VDG2`),
+                sum(detresults$`FP VDG3`), sum(detresults$`FP VDG4`))
+sd_g       <- sapply(1:4, function(k) sum(detresults$`screen detected` == 1 &
+                                            detresults$`Last Screen VDG` == k, na.rm = TRUE))
+recall_rates <- data.frame(
+  Measure   = c("All screens", "First screens", "Repeat screens",
+                paste("Density grade", 1:4)),
+  Predicted = 100 * c((fp_all + sum(detresults$`screen detected`)) / n_screens,
+                      (fp_first + sd_first) / n_first,
+                      (fp_all - fp_first + sum(detresults$`screen detected`) - sd_first) /
+                        (n_screens - n_first),
+                      (fp_g + sd_g) / screens_g),
+  Observed  = c(3.3, 6.2, 2.8, 3.0, 4.5, 5.5, 5.3)
+)
+recall_rates$Predicted <- round(recall_rates$Predicted, 2)
+fp_rate_overall <- 100 * fp_all / n_screens
+biopsies_per_1000 <- 1000 * sum(detresults$Biopsies) / n_screens
+recall_rates

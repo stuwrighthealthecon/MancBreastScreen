@@ -50,6 +50,11 @@ run_des_vectorised <- function(risk_df,
   df$age                  <- rep(start_age, n)
   df$last_screen_age      <- rep(NA_real_, n)    #Age at last screen attended
   df$last_screen_vdg      <- rep(NA_integer_, n) #Density grade at last screen attended
+  df$recall_first         <- integer(n)          #False-positive recall at first screen
+  df$screens_vdg1 <- integer(n); df$screens_vdg2 <- integer(n)   #Screens attended by
+  df$screens_vdg3 <- integer(n); df$screens_vdg4 <- integer(n)   #density grade at screen
+  df$recalls_vdg1 <- integer(n); df$recalls_vdg2 <- integer(n)   #False-positive recalls by
+  df$recalls_vdg3 <- integer(n); df$recalls_vdg4 <- integer(n)   #density grade at screen
   df$active               <- rep(TRUE, n)   #Is person active in simulation (alive and cancer free)
   df$interval_ca          <- integer(n)     #Interval cancer detected
   df$screen_detected_ca   <- integer(n)     #Cancer found by screening
@@ -210,6 +215,10 @@ run_des_vectorised <- function(risk_df,
     vdg_now[act_idx] <- 1L + findInterval(vbd_now[act_idx], VDG_interval)
     df$last_screen_age[act_idx] <- screen_age_vec[act_idx]
     df$last_screen_vdg[act_idx] <- vdg_now[act_idx]
+    df$screens_vdg1 <- df$screens_vdg1 + (act_idx & vdg_now == 1L)
+    df$screens_vdg2 <- df$screens_vdg2 + (act_idx & vdg_now == 2L)
+    df$screens_vdg3 <- df$screens_vdg3 + (act_idx & vdg_now == 3L)
+    df$screens_vdg4 <- df$screens_vdg4 + (act_idx & vdg_now == 4L)
     
     # Lookup discount rates
     disc_screen          <- rep(NA_real_, n)
@@ -353,7 +362,12 @@ run_des_vectorised <- function(risk_df,
     if (any(fp_idx)) {
       fp_cost <- (cost_follow_up + biopsy_idx[fp_idx] * cost_biop) *
         disc_screen[fp_idx]
-      df$fp_count[fp_idx]    <- df$fp_count[fp_idx]    + 1L
+      df$recall_count[fp_idx] <- df$recall_count[fp_idx] + 1L
+      df$recall_first[fp_idx & df$screen_count == 1L] <- 1L
+      df$recalls_vdg1 <- df$recalls_vdg1 + (fp_idx & vdg_now == 1L)
+      df$recalls_vdg2 <- df$recalls_vdg2 + (fp_idx & vdg_now == 2L)
+      df$recalls_vdg3 <- df$recalls_vdg3 + (fp_idx & vdg_now == 3L)
+      df$recalls_vdg4 <- df$recalls_vdg4 + (fp_idx & vdg_now == 4L)
       df$biopsy_count[biopsy_idx]    <- df$biopsy_count[biopsy_idx]    + 1L
       df$costs[fp_idx]           <- df$costs[fp_idx]           + fp_cost
       df$costs_follow_up[fp_idx] <- df$costs_follow_up[fp_idx] + fp_cost
@@ -491,6 +505,17 @@ run_des_vectorised <- function(risk_df,
     `Cancer Size`          = df$cd_size,
     `Last Screen Age`      = df$last_screen_age,
     `Last Screen VDG`      = df$last_screen_vdg,
+    `False Positives`      = df$recall_count,
+    `Biopsies`             = df$biopsy_count,
+    `FP First Screen`      = df$recall_first,
+    `Screens VDG1`         = df$screens_vdg1,
+    `Screens VDG2`         = df$screens_vdg2,
+    `Screens VDG3`         = df$screens_vdg3,
+    `Screens VDG4`         = df$screens_vdg4,
+    `FP VDG1`              = df$recalls_vdg1,
+    `FP VDG2`              = df$recalls_vdg2,
+    `FP VDG3`              = df$recalls_vdg3,
+    `FP VDG4`              = df$recalls_vdg4,
     `Death Age`            = df$cd_death_age,
     `Cancer Screen Number` = df$cd_screen_number,
     check.names            = FALSE

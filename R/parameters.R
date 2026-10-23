@@ -250,7 +250,10 @@ get_parameters <- function(screen_strategy = 0L, growth_model = "Nanaa") {
   ca_size_cut <- c(0.025, 5, 10, 15, 20, 30, 128) #Size cut-points for deciding stage
 
   ##########False Positive and Overdiagnosis parameters################
-  fp_rate <- c(0.0239,0.0355,0.0459,0.0439) #UK false-positive rate by breast density grade 1-4
+  #False-positive recall rate per screen by Volpara density grade 1-4, applied
+  #with each woman's grade at the screen. Consistent with Payne et al. 2025:
+  #recall 3.0/4.5/5.5/5.3% minus the implied detection rate by category
+  fp_rate <- c(0.0239,0.0355,0.0459,0.0439)
   biopsy_rate <- 0.506 #Proportion of referrals without cancer that have biopsy
 
   #### Drug data ####
