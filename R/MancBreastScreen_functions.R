@@ -355,20 +355,20 @@ vec_ca_survival_time <- function(stage_cat_vec, Mort_age_vec, age_vec, ca_incide
 #############################################QALY Counter##################
 vec_QALY_counter_core <- function(Mort_age_vec, incidence_age_record_vec, stage_cat_vec) {
   n          <- length(Mort_age_vec)
-  max_years  <- ceiling(max(Mort_age_vec)) - (screen_startage - 1)
+  max_years  <- max(ceiling(max(Mort_age_vec)) - screen_startage, 1)
   
-  # Row = woman, col = year index y (1-indexed from screen_startage)
-  # Initialised to 0
+  # Row = woman, col = year index y: year y covers ages
+  # (screen_startage + y - 1, screen_startage + y], so year 1 = ages 50-51.
+  # Discounting starts at screen_startage, as for costs (year 1 undiscounted)
   QALY_mat <- matrix(0.0, nrow = n, ncol = max_years)
   
   # Fill with discounted age-related utility values
   y_idx      <- seq_len(max_years)
   
-  # Age at each column: (screen_startage - 1) + y
-  age_at_y   <- pmin(ceiling((screen_startage - 1) + y_idx),
-                     max(utility_ages[, 1]))
+  # Age at the start of each year: screen_startage + y - 1
+  age_at_y   <- pmin(screen_startage + y_idx - 1, max(utility_ages[, 1]))
   util_at_y  <- utility_ages[match(age_at_y, utility_ages[, 1]), 2]
-  disc_at_y  <- 1 / (1 + discount_health)^y_idx
+  disc_at_y  <- 1 / (1 + discount_health)^(y_idx - 1)
   
   # Base QALY weight for each column (same row pattern for all women)
   base_weight <- util_at_y * disc_at_y
@@ -377,7 +377,7 @@ vec_QALY_counter_core <- function(Mort_age_vec, incidence_age_record_vec, stage_
   QALY_mat <- matrix(base_weight, nrow = n, ncol = max_years, byrow = TRUE)
   
   # --- Per-woman QALY_length and final-year partial adjustment
-  QALY_length <- pmax(ceiling(Mort_age_vec) - (screen_startage - 1L), 1L)
+  QALY_length <- pmax(ceiling(Mort_age_vec) - screen_startage, 1L)
   frac_last   <- 1 - (ceiling(Mort_age_vec) - Mort_age_vec)
   
   # Zero out columns beyond each woman's life and apply partial-year fraction
@@ -398,17 +398,21 @@ vec_QALY_counter_core <- function(Mort_age_vec, incidence_age_record_vec, stage_
     ma  <- Mort_age_vec[ci]
     
     frac_into_year <- iar - floor(iar)           #to deal with months into year when cancer occurs
-    col_y1         <- floor(iar) - screen_startage      # year-1 column index
-    col_y2         <- col_y1 + 1L                       # year-2 column index
+    col_y1         <- floor(iar) - (screen_startage - 1L) # column of the year containing incidence
+    col_y2         <- col_y1 + 1L                         # year-2 column index
     
     u_y1     <- utility_stage_cat_y1[sc]
     u_follow <- utility_stage_cat_follow[sc]
     
-    # Partial year at incidence (year 1 of cancer)
+    # Year of incidence: full utility before diagnosis, year-1 cancer utility
+    # after it (up to death if she dies in the same year)
     valid1 <- col_y1 >= 1L & col_y1 <= max_years
     if (any(valid1)) {
-      cells1 <- cbind(ci[valid1], col_y1[valid1])
-      QALY_mat[cells1] <- u_y1[valid1] * QALY_mat[cells1] * (1 - frac_into_year[valid1])
+      cells1  <- cbind(ci[valid1], col_y1[valid1])
+      f1      <- frac_into_year[valid1]
+      end1    <- ifelse(col_y1[valid1] == QALY_length[ci[valid1]], frac_last[ci[valid1]], 1)
+      QALY_mat[cells1] <- base_weight[col_y1[valid1]] *
+        (pmin(f1, end1) + u_y1[valid1] * pmax(end1 - f1, 0))
     }
     
     # Transition year (straddles y1 and follow-up utility)
@@ -434,8 +438,9 @@ vec_QALY_counter_core <- function(Mort_age_vec, incidence_age_record_vec, stage_
       ci3  <- ci[has_followup]
       iar3 <- iar[has_followup]; mc3 <- mort_cap[has_followup]; uF3 <- u_follow[has_followup]
       
-      col_start3 <- floor(iar3) + 2L - screen_startage
-      col_end3   <- pmin(floor(iar3) + 8L, ceiling(mc3)) - screen_startage
+      col_start3 <- floor(iar3) + 2L - (screen_startage - 1L)
+      col_end3   <- pmin(floor(iar3) + 8L - (screen_startage - 1L),   # up to year 8 after incidence
+                         ceiling(mc3) - screen_startage)               # or the year of death
       
       col_idx_sub <- matrix(seq_len(max_years), nrow = length(ci3), ncol = max_years, byrow = TRUE)
       mask   <- col_idx_sub >= col_start3 & col_idx_sub <= col_end3
@@ -473,12 +478,14 @@ vec_QALY_counter <- function(Mort_age_vec, incidence_age_record_vec,
 }
 
 vec_QALY_counter_fast <- function(Mort_age_vec, incidence_age_record_vec, stage_cat_vec) {
-  max_years <- ceiling(max(Mort_age_vec)) - (screen_startage - 1)
+  # Year y covers ages (screen_startage + y - 1, screen_startage + y]; discounting
+  # starts at screen_startage (year 1 undiscounted), as for costs
+  max_years <- max(ceiling(max(Mort_age_vec)) - screen_startage, 1)
   y     <- seq_len(max_years)
-  age_y <- pmin(ceiling((screen_startage - 1) + y), max(utility_ages[, 1]))
-  w     <- utility_ages[match(age_y, utility_ages[, 1]), 2] / (1 + discount_health)^y
+  age_y <- pmin(screen_startage + y - 1, max(utility_ages[, 1]))
+  w     <- utility_ages[match(age_y, utility_ages[, 1]), 2] / (1 + discount_health)^(y - 1)
   cw    <- c(0, cumsum(w))                                     # QALYs for whole years
-  L     <- pmax(ceiling(Mort_age_vec) - (screen_startage - 1L), 1L)
+  L     <- pmax(ceiling(Mort_age_vec) - screen_startage, 1L)
   out   <- cw[L] + w[L] * (1 - (ceiling(Mort_age_vec) - Mort_age_vec))  # + part of final year
   ca    <- incidence_age_record_vec > 0
   if (any(ca)) out[ca] <- vec_QALY_counter(Mort_age_vec[ca],
